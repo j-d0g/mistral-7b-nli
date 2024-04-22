@@ -1,0 +1,7 @@
+requests~=2.31.0
+pandas~=2.2.2
+numpy~=1.26.4
+openai~=1.23.1
+python-dotenv~=1.0.1
+replicate~=0.25.1
+anthropic~=0.25.6
