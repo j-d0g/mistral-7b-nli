@@ -10,7 +10,7 @@ class Claude(BaseLLM):
     def get_models(self):
         return {"opus": 'claude-3-opus-20240229', "sonnet": 'claude-3-sonnet-20240229', "haiku": 'claude-3-haiku-20240307'}
 
-    def generate_text(self, model_name="claude-3-haiku-20240307", max_tokens=1024, temperature=0.9, top_p=0.95) -> str:
+    def generate_text(self, model_name="claude-3-haiku-20240307", max_tokens=1024, temperature=0.7, top_p=1.0) -> str:
         response = anthropic.Anthropic().messages.create(
             model=model_name,
             system=self.get_messages()[0]['content'],

@@ -24,7 +24,7 @@ class BaseLLM(ABC):
         self.messages = []
 
     @abstractmethod
-    def generate_text(self, model_name: str, max_tokens: int, temperature: float, top_p: float) -> str:
+    def generate_text(self, model_name, max_tokens, temperature, top_p) -> str:
         pass
 
     @classmethod

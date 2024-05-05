@@ -16,8 +16,8 @@ class Llama(BaseLLM):
             "llama-3-70b": "meta/meta-llama-3-70b-instruct",
         }
 
-    def generate_text(self, model_name="meta/meta-llama-3-8b-instruct", max_tokens=2048, temperature=0.9,
-                      top_p=0.95) -> str:
+    def generate_text(self, model_name="meta/meta-llama-3-8b-instruct", max_tokens=2048, temperature=0.7,
+                      top_p=1.0) -> str:
 
         system = self.messages[0]
         # system = "You are a chess grandmaster. I will give you the move sequence, and you will return your response in JSON format, using 'move' and 'thoughts' as keys. You will return nothing else but this JSON object, with no extra explanations."

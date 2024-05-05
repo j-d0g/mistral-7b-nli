@@ -10,7 +10,7 @@ class ChatGPT(BaseLLM):
     def get_models(self):
         return self.client.models.list()
 
-    def generate_text(self, model_name="gpt-3.5-turbo-0125", max_tokens=1024, temperature=0.9, top_p=0.95) -> str:
+    def generate_text(self, model_name="gpt-3.5-turbo-0125", max_tokens=1024, temperature=0.7, top_p=1.00) -> str:
         response = self.client.chat.completions.create(
             model=model_name,
             messages=self.get_messages(),

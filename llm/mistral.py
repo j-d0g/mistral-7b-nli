@@ -19,7 +19,7 @@ class Mistral(BaseLLM):
             print(f"Error: {response.status_code} - {response.text}")
             return None
 
-    def generate_text(self, model_name="open-mistral-7b", max_tokens=1024, temperature=0.9, top_p=0.95) -> str:
+    def generate_text(self, model_name="open-mistral-7b", max_tokens=1024, temperature=0.7, top_p=1.0) -> str:
         data = {
             "model": model_name,
             "messages": self.get_messages(),
