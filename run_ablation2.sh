@@ -17,10 +17,11 @@ docker run --rm --gpus '"device=1"' \
   mistral-nli-ft \
   bash -c "pip install wandb && python scripts/train_sft.py \
     --output_dir models/mistral-7b-nli-cot-ablation2 \
-    --batch_size 16 \
-    --grad_accumulation_steps 4 \
+    --batch_size 32 \
+    --grad_accumulation_steps 2 \
     --learning_rate 1e-4 \
     --warmup_ratio 0.1 \
-    --max_grad_norm 1.0"
+    --max_grad_norm 1.0 \
+    --num_epochs 3"
 
 echo "Training script execution finished." 

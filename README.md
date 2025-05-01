@@ -17,6 +17,38 @@ The core data is organized as follows:
 
 > **Note:** All scripts default to using sample data if no specific paths are provided. This prevents accidental overwriting of important data during testing.
 
+## Optimized Inference
+
+We've optimized the inference process to efficiently process the 1977-sample NLI test set:
+
+### Optimization Techniques
+
+1. **4-bit Quantization**: Using `bitsandbytes` for efficient memory usage
+2. **Batch Processing**: Optimal batch size of 32 for maximizing throughput
+3. **Sequence Length Reduction**: Reduced from 2048 → 512 tokens (with actual inputs ranging from 212-465 tokens)
+4. **Checkpoint System**: Saves progress every batch and can resume from interruptions
+5. **Consistent Prompting**: Uses the exact prompt format from fine-tuning for optimal results
+
+### Performance Gains
+
+* Initial runtime estimate: ~2hr42min with batch size 8
+* Optimized runtime: ~50min with batch size 32 (>3x speedup)
+* GPU Memory Usage: 15.7GB/24GB VRAM (efficient usage while maintaining performance)
+
+### Running Optimized Inference
+
+To run inference on the test set:
+
+```bash
+./run_inference.sh
+```
+
+This script:
+- Uses the optimized parameters (batch size 32, max length 512)
+- Loads the 4-bit quantized Mistral 7B v0.3 model
+- Runs with Chain-of-Thought reasoning enabled
+- Saves results with timestamps for tracking
+
 ## Methodology
 
 ### 1. CoT Data Generation (Completed)
@@ -102,6 +134,9 @@ For more detailed pipeline information and example commands, see [scripts/README
 .
 ├── Dockerfile
 ├── requirements.txt
+├── run_inference.sh            # Main script to run optimized inference on test set
+├── run_inference.py            # Optimized implementation of NLI inference with 4-bit quantization
+├── prompts.py                  # Centralized prompt template definitions
 ├── data/
 │   ├── original_data/         # Original NLI datasets (CSV)
 │   ├── original_thoughts/     # Original model thought processes (JSON)
@@ -112,6 +147,7 @@ For more detailed pipeline information and example commands, see [scripts/README
 │   ├── reflections/           # Logs from reflection generation process
 │   └── score/                 # Logs from scoring processes
 ├── models/                    # Directory to store trained models/adapters
+├── results/                   # Inference results (predictions, checkpoints, metrics)
 ├── scripts/
 │   ├── generate_thoughts.py            # Script for augmenting original dataset with CoT data
 │   ├── generate_thoughts_reflected.py  # Script for generating reflected CoT data on inaccurate initial predictions

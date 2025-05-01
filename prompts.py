@@ -35,6 +35,13 @@ Premise: The dog chased the cat up the tree. Hypothesis: The cat climbed the tre
 </response>
 """
 
+# --- Fine-tuning Prompt ---
+
+FINETUNE_PROMPT = """Premise: {premise}
+Hypothesis: {hypothesis}
+
+Use chain of thought reasoning to determine if the hypothesis is entailed by the premise. Provide your reasoning and the final label (0 or 1) in JSON format: {{"thought_process": "...", "predicted_label": ...}}"""
+
 # --- Scoring and Improving Thoughts ---
 
 SCORING_SCHEMA = {
@@ -118,6 +125,8 @@ Your response **MUST** be in the following JSON format:
 def get_prompt(prompt_type):
     if prompt_type == 'initial_generation':
         return INITIAL_GENERATION_PROMPT, INITIAL_GENERATION_SCHEMA
+    elif prompt_type == 'finetune':
+        return FINETUNE_PROMPT
     elif prompt_type == 'scoring':
         return SCORING_PROMPT, SCORING_SCHEMA
     elif prompt_type == 'reflection':

@@ -9,6 +9,7 @@ from torch.cuda.amp import autocast
 from datasets import load_dataset
 from peft import LoraConfig, prepare_model_for_kbit_training
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, set_seed, DataCollatorForLanguageModeling
+from transformers.trainer_callback import EarlyStoppingCallback
 from trl import SFTTrainer, SFTConfig
 
 # Configure logging
@@ -33,7 +34,7 @@ DEFAULT_CONFIG = {
     "lora_dropout": 0.05,
     
     # Training parameters
-    "num_epochs": 1,
+    "num_epochs": 3,  # Allow up to 3 epochs
     "max_seq_length": 512,
     "batch_size": 16,
     "grad_accumulation_steps": 2,
@@ -52,7 +53,9 @@ DEFAULT_CONFIG = {
     # Other settings
     "use_packing": False,
     "gradient_checkpointing": True,
-    "use_wandb": True
+    "use_wandb": True,
+    "resume_from_checkpoint": None,  # Default to not resuming
+    "wandb_run_id": None  # For resuming the same wandb run
 }
 
 def parse_args():
@@ -91,6 +94,8 @@ def parse_args():
     parser.add_argument("--use_packing", action="store_true", default=DEFAULT_CONFIG["use_packing"], help="Enable packing")
     parser.add_argument("--no_gradient_checkpointing", action="store_true", help="Disable gradient checkpointing")
     parser.add_argument("--no_wandb", action="store_true", help="Disable Weights & Biases logging")
+    parser.add_argument("--resume_from_checkpoint", type=str, default=DEFAULT_CONFIG["resume_from_checkpoint"], help="Path to checkpoint to resume from, or 'latest'")
+    parser.add_argument("--wandb_run_id", type=str, default=DEFAULT_CONFIG["wandb_run_id"], help="Wandb run ID to resume")
     
     args = parser.parse_args()
     
@@ -242,6 +247,13 @@ def main():
 
     # 7. Define Training Arguments (using SFTConfig)
     logger.info("Defining SFT Training Arguments...")
+    
+    # Configure wandb resume if needed
+    if args.use_wandb and args.wandb_run_id:
+        os.environ["WANDB_RESUME"] = "allow"
+        os.environ["WANDB_RUN_ID"] = args.wandb_run_id
+        logger.info(f"Configured to resume wandb run with ID: {args.wandb_run_id}")
+    
     training_args = SFTConfig(
         output_dir=args.output_dir,
         num_train_epochs=args.num_epochs,
@@ -270,6 +282,7 @@ def main():
         report_to="wandb" if args.use_wandb else "none",
         seed=args.seed,
         remove_unused_columns=False,  # Don't remove unused columns to prevent errors
+        resume_from_checkpoint=args.resume_from_checkpoint,
     )
 
     # 8. Initialize Trainer with autocast for BF16 precision
@@ -295,6 +308,7 @@ def main():
         return_tensors="pt"
     )
     
+    # Add early stopping callback
     trainer = SFTTrainer(
         model=model,
         processing_class=tokenizer,  # Using processing_class instead of tokenizer (TRL 0.12.0)
@@ -303,12 +317,13 @@ def main():
         eval_dataset=processed_dataset['eval'],
         peft_config=peft_config,
         data_collator=data_collator,  # Add the data collator
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)]  # Stop after 3 evals with no improvement
     )
 
     # 9. Start Training
     logger.info("Starting training...")
     try:
-        train_result = trainer.train()
+        train_result = trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
 
         # Log metrics
         metrics = train_result.metrics
