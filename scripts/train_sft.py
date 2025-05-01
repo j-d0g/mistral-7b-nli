@@ -3,11 +3,12 @@ import logging
 import os
 import torch
 import torch.nn as nn
+import argparse
 from torch.cuda.amp import autocast
 
 from datasets import load_dataset
 from peft import LoraConfig, prepare_model_for_kbit_training
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, set_seed
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, set_seed, DataCollatorForLanguageModeling
 from trl import SFTTrainer, SFTConfig
 
 # Configure logging
@@ -18,59 +19,157 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --- Configuration ---
-MODEL_ID = "mistralai/Mistral-7B-v0.3"
-TRAIN_DATA = "data/finetune/train_ft.jsonl"
-EVAL_DATA = "data/finetune/dev_ft.jsonl"
-OUTPUT_DIR = "models/mistral-7b-nli-cot"
-SEED = 42
+# Default configuration (can be overridden by command line args)
+DEFAULT_CONFIG = {
+    "model_id": "mistralai/Mistral-7B-v0.3",
+    "train_data": "data/finetune/train_ft.jsonl",
+    "eval_data": "data/finetune/dev_ft.jsonl",
+    "output_dir": "models/mistral-7b-nli-cot",
+    "seed": 42,
+    
+    # LoRA parameters
+    "lora_r": 16,
+    "lora_alpha": 32,
+    "lora_dropout": 0.05,
+    
+    # Training parameters
+    "num_epochs": 1,
+    "max_seq_length": 512,
+    "batch_size": 16,
+    "grad_accumulation_steps": 2,
+    "learning_rate": 2e-4,
+    "lr_scheduler": "cosine",
+    "warmup_ratio": 0.03,
+    "weight_decay": 0.01,
+    "max_grad_norm": None,  # No gradient clipping by default
+    
+    # Evaluation and logging
+    "logging_steps": 25,
+    "eval_steps": 250,
+    "save_steps": 250,
+    "save_total_limit": 2,
+    
+    # Other settings
+    "use_packing": False,
+    "gradient_checkpointing": True,
+    "use_wandb": True
+}
 
-# Optimized QLoRA Config for 4090 GPUs
-LORA_R = 16             # LoRA attention dimension
-LORA_ALPHA = 32         # LoRA alpha parameter
-LORA_DROPOUT = 0.05     # Dropout probability for LoRA layers
-TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj"]  # Target modules for LoRA
-
-# Optimized Training Config for 9-hour constraint
-NUM_EPOCHS = 1                  # Single epoch is sufficient for this task
-MAX_SEQ_LENGTH = 2048           # Maximum sequence length (adjust based on your data)
-BATCH_SIZE_PER_DEVICE = 1       # Reduced to 1 to avoid sequence length mismatches
-GRAD_ACCUMULATION_STEPS = 16    # Increased to maintain effective batch size 16
-LEARNING_RATE = 2e-4            # Slightly higher LR for faster convergence
-LR_SCHEDULER = "cosine"         # Cosine scheduler with warmup
-WARMUP_RATIO = 0.03             # Warm up for first 3% of training steps
-WEIGHT_DECAY = 0.01             # L2 regularization
-OPTIMIZER = "paged_adamw_8bit"  # Memory-efficient optimizer
-LOGGING_STEPS = 25              # Log every 25 steps
-EVAL_STEPS = 250                # Evaluate every 250 steps
-SAVE_STEPS = 250                # Save checkpoint every 250 steps (matching eval)
-SAVE_TOTAL_LIMIT = 2            # Keep only 2 checkpoints to save disk space
-USE_PACKING = False             # Disable packing for more stable training
-GRADIENT_CHECKPOINTING = True   # Enable gradient checkpointing for memory efficiency
-USE_WANDB = True                # Enable Weights & Biases logging
+def parse_args():
+    parser = argparse.ArgumentParser(description="Fine-tune Mistral-7B for NLI with Chain-of-Thought")
+    
+    # Model and data paths
+    parser.add_argument("--model_id", type=str, default=DEFAULT_CONFIG["model_id"], help="HuggingFace model ID")
+    parser.add_argument("--train_data", type=str, default=DEFAULT_CONFIG["train_data"], help="Path to training data")
+    parser.add_argument("--eval_data", type=str, default=DEFAULT_CONFIG["eval_data"], help="Path to evaluation data")
+    parser.add_argument("--output_dir", type=str, default=DEFAULT_CONFIG["output_dir"], help="Directory to save model")
+    parser.add_argument("--seed", type=int, default=DEFAULT_CONFIG["seed"], help="Random seed")
+    
+    # LoRA parameters
+    parser.add_argument("--lora_r", type=int, default=DEFAULT_CONFIG["lora_r"], help="LoRA attention dimension")
+    parser.add_argument("--lora_alpha", type=int, default=DEFAULT_CONFIG["lora_alpha"], help="LoRA alpha parameter")
+    parser.add_argument("--lora_dropout", type=float, default=DEFAULT_CONFIG["lora_dropout"], help="LoRA dropout")
+    
+    # Training parameters
+    parser.add_argument("--num_epochs", type=int, default=DEFAULT_CONFIG["num_epochs"], help="Number of training epochs")
+    parser.add_argument("--max_seq_length", type=int, default=DEFAULT_CONFIG["max_seq_length"], help="Maximum sequence length")
+    parser.add_argument("--batch_size", type=int, default=DEFAULT_CONFIG["batch_size"], help="Per-device batch size")
+    parser.add_argument("--grad_accumulation_steps", type=int, default=DEFAULT_CONFIG["grad_accumulation_steps"], help="Gradient accumulation steps")
+    parser.add_argument("--learning_rate", type=float, default=DEFAULT_CONFIG["learning_rate"], help="Learning rate")
+    parser.add_argument("--lr_scheduler", type=str, default=DEFAULT_CONFIG["lr_scheduler"], help="Learning rate scheduler type")
+    parser.add_argument("--warmup_ratio", type=float, default=DEFAULT_CONFIG["warmup_ratio"], help="Warmup ratio")
+    parser.add_argument("--weight_decay", type=float, default=DEFAULT_CONFIG["weight_decay"], help="Weight decay")
+    parser.add_argument("--max_grad_norm", type=float, default=DEFAULT_CONFIG["max_grad_norm"], help="Maximum gradient norm for clipping")
+    
+    # Evaluation and logging
+    parser.add_argument("--logging_steps", type=int, default=DEFAULT_CONFIG["logging_steps"], help="Logging steps")
+    parser.add_argument("--eval_steps", type=int, default=DEFAULT_CONFIG["eval_steps"], help="Evaluation steps")
+    parser.add_argument("--save_steps", type=int, default=DEFAULT_CONFIG["save_steps"], help="Save steps")
+    parser.add_argument("--save_total_limit", type=int, default=DEFAULT_CONFIG["save_total_limit"], help="Save total limit")
+    
+    # Other settings
+    parser.add_argument("--use_packing", action="store_true", default=DEFAULT_CONFIG["use_packing"], help="Enable packing")
+    parser.add_argument("--no_gradient_checkpointing", action="store_true", help="Disable gradient checkpointing")
+    parser.add_argument("--no_wandb", action="store_true", help="Disable Weights & Biases logging")
+    
+    args = parser.parse_args()
+    
+    # Handle inverse flags
+    args.gradient_checkpointing = not args.no_gradient_checkpointing
+    args.use_wandb = not args.no_wandb
+    
+    return args
 
 def main():
-    set_seed(SEED)
-    logger.info(f"Starting SFT run with output dir: {OUTPUT_DIR}")
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-
+    # Parse command line arguments
+    args = parse_args()
+    
+    # Set random seed
+    set_seed(args.seed)
+    logger.info(f"Starting SFT run with output dir: {args.output_dir}")
+    os.makedirs(args.output_dir, exist_ok=True)
+    
+    # Log current CUDA device and GPU info
+    device_id = torch.cuda.current_device()
+    gpu_count = torch.cuda.device_count()
+    device_name = torch.cuda.get_device_name(device_id)
+    logger.info(f"Current CUDA device: {device_id}")
+    logger.info(f"Available CUDA devices: {gpu_count}")
+    logger.info(f"CUDA device name: {device_name}")
+    
     # 1. Load Datasets
     logger.info("Loading datasets...")
     try:
-        dataset = load_dataset("json", data_files={"train": TRAIN_DATA, "eval": EVAL_DATA})
+        dataset = load_dataset("json", data_files={"train": args.train_data, "eval": args.eval_data})
         logger.info(f"Datasets loaded: {dataset}")
     except Exception as e:
         logger.error(f"Failed to load datasets: {e}")
         return
 
     # 2. Load Tokenizer
-    logger.info(f"Loading tokenizer for {MODEL_ID}...")
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
+    logger.info(f"Loading tokenizer for {args.model_id}...")
+    tokenizer = AutoTokenizer.from_pretrained(args.model_id, trust_remote_code=True)
     tokenizer.padding_side = 'right'
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
         logger.info("Set pad_token to eos_token")
-
+        
+    # Configure tokenizer padding strategy
+    tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "right"
+    
+    # Helper function for dataset processing to ensure consistent lengths
+    def preprocess_function(examples):
+        # Don't return tensors from the tokenizer in preprocessing
+        return tokenizer(
+            examples['text'],
+            padding=False,  # We'll handle padding in the data collator
+            truncation=True,
+            max_length=args.max_seq_length
+        )
+        
+    # Apply preprocessing to datasets
+    logger.info("Preprocessing datasets to ensure consistent tensor shapes...")
+    try:
+        processed_dataset = {
+            'train': dataset['train'].map(
+                preprocess_function,
+                batched=True,
+                batch_size=100,
+                remove_columns=['text']  # Remove the original text
+            ),
+            'eval': dataset['eval'].map(
+                preprocess_function,
+                batched=True,
+                batch_size=100,
+                remove_columns=['text']  # Remove the original text
+            )
+        }
+        logger.info(f"Preprocessing complete.")
+    except Exception as e:
+        logger.error(f"Failed to preprocess datasets: {e}")
+        processed_dataset = dataset  # Fallback to original dataset
+    
     # 3. Define QLoRA Config (BitsAndBytes)
     logger.info("Defining BitsAndBytes quantization config...")
     compute_dtype = torch.bfloat16
@@ -82,12 +181,12 @@ def main():
     )
 
     # 4. Load Base Model
-    logger.info(f"Loading base model {MODEL_ID} with QLoRA config...")
+    logger.info(f"Loading base model {args.model_id} with QLoRA config...")
     try:
         model = AutoModelForCausalLM.from_pretrained(
-            MODEL_ID,
+            args.model_id,
             quantization_config=bnb_config,
-            device_map={"": 0},  # Force loading onto the first GPU
+            device_map={"": 0},  # Use device 0 inside the container
             attn_implementation="flash_attention_2" if hasattr(torch.nn.functional, 'scaled_dot_product_attention') else None,
             torch_dtype=compute_dtype,
             trust_remote_code=True,
@@ -103,11 +202,11 @@ def main():
     # 5. Prepare model for K-bit training & Gradient Checkpointing
     logger.info("Preparing model for k-bit training with gradient checkpointing...")
     try:
-        model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=GRADIENT_CHECKPOINTING)
+        model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=args.gradient_checkpointing)
         # Verify if gradient checkpointing is enabled
         if hasattr(model, 'is_gradient_checkpointing') and model.is_gradient_checkpointing:
             logger.info("Gradient checkpointing successfully enabled via prepare_model_for_kbit_training.")
-        elif GRADIENT_CHECKPOINTING:
+        elif args.gradient_checkpointing:
              logger.warning("prepare_model_for_kbit_training finished, but model.is_gradient_checkpointing is not True. Check configuration.")
         else:
              logger.info("Gradient checkpointing is disabled by configuration.")
@@ -133,10 +232,10 @@ def main():
     # 6. Define PEFT Config (LoRA)
     logger.info("Defining LoRA config...")
     peft_config = LoraConfig(
-        r=LORA_R,
-        lora_alpha=LORA_ALPHA,
-        lora_dropout=LORA_DROPOUT,
-        target_modules=TARGET_MODULES,
+        r=args.lora_r,
+        lora_alpha=args.lora_alpha,
+        lora_dropout=args.lora_dropout,
+        target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
         bias="none",
         task_type="CAUSAL_LM",
     )
@@ -144,31 +243,32 @@ def main():
     # 7. Define Training Arguments (using SFTConfig)
     logger.info("Defining SFT Training Arguments...")
     training_args = SFTConfig(
-        output_dir=OUTPUT_DIR,
-        num_train_epochs=NUM_EPOCHS,
-        per_device_train_batch_size=BATCH_SIZE_PER_DEVICE,
-        per_device_eval_batch_size=BATCH_SIZE_PER_DEVICE, 
-        gradient_accumulation_steps=GRAD_ACCUMULATION_STEPS,
-        optim=OPTIMIZER,
-        learning_rate=LEARNING_RATE,
-        lr_scheduler_type=LR_SCHEDULER,
-        warmup_ratio=WARMUP_RATIO,
-        weight_decay=WEIGHT_DECAY,
-        max_seq_length=MAX_SEQ_LENGTH,
-        packing=USE_PACKING,
+        output_dir=args.output_dir,
+        num_train_epochs=args.num_epochs,
+        per_device_train_batch_size=args.batch_size,
+        per_device_eval_batch_size=args.batch_size, 
+        gradient_accumulation_steps=args.grad_accumulation_steps,
+        optim="paged_adamw_8bit",
+        learning_rate=args.learning_rate,
+        lr_scheduler_type=args.lr_scheduler,
+        warmup_ratio=args.warmup_ratio,
+        weight_decay=args.weight_decay,
+        max_grad_norm=args.max_grad_norm,  # Add gradient clipping
+        max_seq_length=args.max_seq_length,
+        packing=args.use_packing,
         bf16=True,  # Enable BF16 with autocast
         fp16=False, # Disable FP16
-        logging_steps=LOGGING_STEPS,
+        logging_steps=args.logging_steps,
         eval_strategy="steps",  # Evaluate at regular intervals
-        eval_steps=EVAL_STEPS,        # Evaluate every N steps
+        eval_steps=args.eval_steps,        # Evaluate every N steps
         save_strategy="steps",        # Save at regular intervals
-        save_steps=SAVE_STEPS,        # Save every N steps
-        save_total_limit=SAVE_TOTAL_LIMIT,  # Limit the total number of checkpoints
+        save_steps=args.save_steps,        # Save every N steps
+        save_total_limit=args.save_total_limit,  # Limit the total number of checkpoints
         load_best_model_at_end=True,  # Load the best model at the end
         metric_for_best_model="eval_loss",  # Use eval loss to determine best model
         greater_is_better=False,      # Lower loss is better
-        report_to="wandb" if USE_WANDB else "none",
-        seed=SEED,
+        report_to="wandb" if args.use_wandb else "none",
+        seed=args.seed,
         remove_unused_columns=False,  # Don't remove unused columns to prevent errors
     )
 
@@ -187,13 +287,22 @@ def main():
     # Replace the forward method with our patched version
     model.forward = forward_with_autocast
     
+    # Create a data collator that will properly pad sequences
+    logger.info("Creating data collator for properly aligning sequences...")
+    data_collator = DataCollatorForLanguageModeling(
+        tokenizer=tokenizer, 
+        mlm=False,
+        return_tensors="pt"
+    )
+    
     trainer = SFTTrainer(
         model=model,
         processing_class=tokenizer,  # Using processing_class instead of tokenizer (TRL 0.12.0)
         args=training_args,
-        train_dataset=dataset['train'],
-        eval_dataset=dataset['eval'],
+        train_dataset=processed_dataset['train'],
+        eval_dataset=processed_dataset['eval'],
         peft_config=peft_config,
+        data_collator=data_collator,  # Add the data collator
     )
 
     # 9. Start Training
@@ -207,7 +316,7 @@ def main():
         trainer.save_metrics("train", metrics)
 
         # 10. Save Final Model (Adapter)
-        logger.info(f"Saving final adapter model to {OUTPUT_DIR}")
+        logger.info(f"Saving final adapter model to {args.output_dir}")
         trainer.save_model()
 
         logger.info("Training finished successfully!")
