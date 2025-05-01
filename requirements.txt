@@ -1,15 +1,18 @@
 # Core ML Libraries
 torch --index-url https://download.pytorch.org/whl/cu121
-transformers>=4.38.0
-peft>=0.9.0
-trl>=0.8.0
-datasets>=2.16.0
-accelerate>=0.27.0
-bitsandbytes>=0.43.0
+transformers
+peft
+trl
+datasets
+accelerate
+bitsandbytes
+sentencepiece
+flash-attn
+protobuf
 
 # Data Handling & Metrics
-pandas>=2.0.0
-scikit-learn>=1.3.0
+# pandas>=2.0.0 # Removed - Not essential for simple_run_sft.py
+# scikit-learn>=1.3.0 # Removed - Not essential for simple_run_sft.py
 
 # Optional Logging
-wandb 
+wandb  # Enabled for training monitoring 

@@ -17,6 +17,9 @@ COPY requirements.txt .
 # Using --no-cache-dir to reduce image size
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Add sentencepiece explicitly
+RUN pip install --no-cache-dir sentencepiece
+
 # Copy the rest of the application code
 COPY . .
 
