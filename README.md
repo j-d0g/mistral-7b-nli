@@ -1,98 +1,128 @@
-# Mistral NLI with Chain-of-Thought Refinement
+# Mistral-7b Fine-Tuning for NLI with Chain-of-Thought
 
-## Overview
+This project focuses on fine-tuning the Mistral-7B language model for Natural Language Inference (NLI) tasks, specifically using Chain-of-Thought (CoT) reasoning to improve classification performance and interpretability.
 
-This project focuses on fine-tuning Mistral-7B models for Natural Language Inference (NLI) tasks. The core idea is to augment a standard NLI dataset (premise, hypothesis, label) with Chain-of-Thought (CoT) reasoning to improve model performance.
+## Project Goal
 
-A key challenge is generating high-quality CoT reasoning. This repository implements a multi-stage workflow to address this:
+The primary objective is to instruction-tune Mistral-7B using a custom NLI dataset augmented with CoT reasoning. The final model should accurately classify premise-hypothesis pairs as either entailment (1) or no-entailment (0), maximizing performance on a hidden test set.
 
-1.  **Initial CoT Generation:** Use the Mistral API (`prediction_service.py`) to generate an initial CoT (`thought_process`) and predict the NLI label for each example in the base dataset. Since the true label isn't provided during this step, the predictions and reasoning can be noisy or incorrect.
-2.  **Scoring and Refinement:** Pass the augmented dataset (including the initial thoughts and predicted labels) through a `scoring_service.py`. This service uses Mistral models (potentially stronger ones like Mixtral) to evaluate the quality of the generated thoughts, assign a score, potentially correct the predicted label, and generate an *improved* thought process.
-3.  **Gold-Standard Dataset Creation:** Filter or utilize the outputs from the scoring service based on the quality score to create a high-quality, "gold-standard" dataset containing reliable CoT reasoning and accurate labels.
-4.  **Fine-tuning:** Use this gold-standard dataset for the final fine-tuning process of a Mistral-7B model (details of the fine-tuning process itself might be outside the immediate scope of the services defined here, but the data generation pipeline supports it).
+## Data
 
-The services are designed to interact with the Mistral API and produce structured JSON outputs.
+The core data is organized as follows:
 
-## Features
+*   `data/original_data/`: Original NLI premise-hypothesis pairs with labels (train.csv, dev.csv, test.csv).
+*   `data/original_thoughts/`: JSON Lines files containing examples augmented with Chain-of-Thought (`thought_process`) and the model's original `predicted_label`, generated using `scripts/generate_thoughts.py`.
+*   `data/reflected_thoughts/`: Contains reflection data for examples where the model prediction was incorrect, generated using `scripts/generate_thoughts_reflected.py`.
+*   `data/finetune/`: Prepared data for fine-tuning in the instruction format expected by the SFT trainer.
 
-*   **Mistral API Integration:** Classes (`llm/mistral.py`) for interacting with the official Mistral AI API.
-*   **Prediction Service:** Generates initial CoT reasoning and NLI labels (`service/prediction_service.py`).
-*   **Scoring Service:** Evaluates and refines CoT reasoning and labels (`service/scoring_service.py`).
-*   **Pydantic Validation:** Uses Pydantic models (`models/response_models.py`) for robust validation of JSON responses from the API.
-*   **Modular Structure:** Code is organized into services, LLM abstractions, models, and utilities.
-*   **JSON Output:** Services are designed to produce structured JSON containing thoughts and labels.
-*   **Testing Suite:** Includes unit and integration tests (`tests/`) using `pytest`.
+> **Note:** All scripts default to using sample data if no specific paths are provided. This prevents accidental overwriting of important data during testing.
+
+## Methodology
+
+### 1. CoT Data Generation (Completed)
+
+*   The `scripts/generate_thoughts.py` script is used to query the Mistral API (`open-mistral-7b` model) for each example in train and dev CSV files.
+*   The script prompts the model to produce a step-by-step reasoning (`thought_process`) and a final classification label (`predicted_label`) in JSON format.
+*   It supports three prompt types: `initial_generation`, `scoring`, and `regeneration`.
+*   Analysis scripts are used to verify data integrity, check for duplicates, and calculate baseline performance metrics of the original model's predictions.
+
+### 2. Reflection on Incorrect Examples (Optional)
+
+*   The `scripts/generate_thoughts_reflected.py` script is used to generate improved reasoning for examples where the model prediction was incorrect.
+*   This separate script takes the original thought process JSON and identifies the incorrect examples, then asks a (potentially stronger) model to reflect on the errors and generate improved reasoning.
+*   The output includes the original thought process, error analysis, and improved reasoning, all preserving the correct label.
+*   Reflection results are saved in `data/reflected_thoughts/` directory.
+
+### 3. SFT Data Preparation
+
+*   The `scripts/prepare_ft_data.py` script creates a dataset by combining correct examples from original predictions with reflected examples for incorrect predictions.
+*   The script inputs the original thoughts and the reflected thoughts, filters for correct examples from the original dataset, and combines them with all the reflected examples.
+*   This approach ensures the highest quality training data: correct examples are reused as-is, while incorrect examples are replaced with their reflected, improved versions.
+*   The `scripts/prepare_finetuning_data.py` is also available for more general data preparation options.
+*   All outputs use Mistral-style instruction tags `[INST]...[/INST]` to frame the task, with the target completion being the JSON string containing the `thought_process` and `predicted_label`.
+    ```
+    <s>[INST] Premise: ...\nHypothesis: ...\n\n...instruction... [/INST] {"thought_process": "...", "predicted_label": ...} </s>
+    ```
+
+### 4. Fine-Tuning Strategy
+
+We use QLoRA for parameter-efficient fine-tuning.
+
+*   **Base Model:** `mistralai/Mistral-7B-v0.3`
+*   **QLoRA Config:** `r=32`, `lora_alpha=64`, dropout `0.05`, target modules `["q_proj", "k_proj", "v_proj", "o_proj"]`.
+*   **Training Script:** `scripts/run_sft.py` (uses `transformers.Trainer` / `trl.SFTTrainer`).
+*   **Hyperparameters:** 3-5 epochs (with early stopping patience 3 based on eval loss), LR `2e-4` (linear decay, 3% warmup), AdamW optimizer (WD `0.01`), effective batch size 64, `bf16` precision.
+
+#### Training Ablations:
+
+1.  **Ablation 1 (Correct Only):** Train on examples where the original model's prediction was correct.
+2.  **Ablation 2 (Reflected Thought Process - *Primary Goal*):**
+    *   Incorporate thought process reflections for originally incorrect examples with a stronger model.
+    *   Combine high-quality reflected examples with original correct examples.
+    *   Implemented in `scripts/prepare_ft_data.py`.
+3.  **Ablation 3 (Unmodified):** Train on all original examples, regardless of correctness.
+
+### 5. Docker Setup
+
+*   A `Dockerfile` is provided to build a container image with all necessary dependencies (PyTorch, CUDA, Transformers, PEFT, TRL, bitsandbytes, etc.).
+*   Training can be executed within this Docker container on a remote workstation with GPUs.
+*   `requirements.txt` lists the Python dependencies.
+
+### 6. Evaluation
+
+*   Primary evaluation metric is accuracy on the hidden test set.
+*   During training, validation loss is monitored for early stopping and checkpointing.
+*   Validation accuracy, precision, recall, and F1 can also be tracked if a `compute_metrics` function is added to `run_sft.py`.
+
+## Complete Pipeline
+
+The complete data preparation pipeline consists of the following steps:
+
+1. **Generate Initial Thoughts** (generate_thoughts.py)
+   - Input: Original CSV data (premise, hypothesis, true_label)
+   - Output: JSON with original thought processes + predicted_label + correct flag
+
+2. **Generate Reflections** (generate_thoughts_reflected.py)
+   - Input: Original thought JSONs (from step 1)
+   - Output: JSON with improved thought processes for incorrect examples only
+
+3. **Prepare Fine-tuning Data** (prepare_ft_data.py)
+   - Input: Original thoughts + Reflected thoughts
+   - Output: JSONL formatted for fine-tuning (combines correct originals + all reflections)
+
+4. **Optional: Score Thought Processes** (score_thoughts.py)
+   - Input: Original and/or reflected thought JSONs
+   - Output: Scored examples with quality assessment
+
+For more detailed pipeline information and example commands, see [scripts/README.md](scripts/README.md).
 
 ## Repository Structure
 
 ```
 .
-├── data/              # (Optional) Base NLI datasets
-├── llm/               # Language model API clients (e.g., mistral.py)
-├── models/            # Pydantic models for data validation
-├── notebooks/         # Jupyter notebooks for experimentation
-├── scripts/           # Utility and test scripts
-├── service/           # Core logic for prediction and scoring
-├── tests/             # Pytest tests for services and utilities
-├── utils/             # Shared utility functions (e.g., json_helpers.py)
-├── .env               # Environment variables (API keys) - Gitignored
-├── requirements.txt   # Python dependencies
-└── README.md          # This file
-```
-
-## Setup
-
-1.  **Clone the Repository:**
-    ```bash
-    git clone <repository-url>
-    cd mistral-7b-nli
-    ```
-
-2.  **Create a Virtual Environment:**
-    ```bash
-    python -m venv venv
-    source venv/bin/activate  # On Windows use `venv\Scripts\activate`
-    ```
-
-3.  **Install Dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-4.  **Set up Environment Variables:**
-    *   Create a file named `.env` in the project root.
-    *   Add your Mistral API key to it:
-        ```env
-        MISTRAL_API_KEY=your_mistral_api_key_here
-        ```
-
-## Usage
-
-The core logic resides in the `service` modules. You can import and use the `predict_label` and `generate_score` functions in your own scripts or notebooks.
-
-*   **Prediction Service (`predict_label`):** Takes a premise, hypothesis, true label (for benchmarking), an LLM client instance, model details, and file paths. It calls the Mistral API to generate thoughts and a predicted label, returning a JSON-like dictionary.
-*   **Scoring Service (`generate_score`):** Takes premise, hypothesis, the *initial thoughts* and *predicted label* from the prediction service, true label, LLM client, model details, and file paths. It calls the Mistral API to generate a score, an improved thought process, and a potentially corrected label.
-
-**Example Scripts:**
-
-*   `scripts/validate_llm_json.py`: Utility to test JSON validation.
-*   `scripts/generate_thoughts.py`: Script for generating initial thoughts and predictions.
-*   `scripts/score_thoughts.py`: Script for scoring and refining generated thoughts.
-
-To run the generate thoughts script (requires `.env` file):
-```bash
-python scripts/generate_thoughts.py
-```
-
-## Testing
-
-This project uses `pytest`. To run the tests:
-
-1.  Ensure you have installed dependencies (`pip install -r requirements.txt`). You might need `pytest` specifically (`pip install pytest`).
-2.  Make sure your `.env` file is configured if you want to run integration tests that hit the actual API.
-3.  Run the tests from the project root:
-    ```bash
-    python -m pytest tests/ -v
-    ```
-
-    *   Tests requiring an API key are marked with `@pytest.mark.skipif` and will be skipped if the `MISTRAL_API_KEY` environment variable is not found.
+├── Dockerfile
+├── requirements.txt
+├── data/
+│   ├── original_data/         # Original NLI datasets (CSV)
+│   ├── original_thoughts/     # Original model thought processes (JSON)
+│   ├── reflected_thoughts/    # Reflected thought processes for incorrect examples (JSON)
+│   └── finetune/              # Prepared data for fine-tuning (JSONL)
+├── logs/                      # Organized logging directory
+│   ├── thoughts/              # Logs from thought generation process
+│   ├── reflections/           # Logs from reflection generation process
+│   └── score/                 # Logs from scoring processes
+├── models/                    # Directory to store trained models/adapters
+├── scripts/
+│   ├── generate_thoughts.py            # Script for augmenting original dataset with CoT data
+│   ├── generate_thoughts_reflected.py  # Script for generating reflected CoT data on inaccurate initial predictions
+│   ├── score_thoughts.py               # Script for generating a scoring and self-improvement loop for thought processes
+│   ├── prepare_ft_data.py              # Script to prepare Ablation 2 data (correct + reflections)
+│   ├── prepare_finetuning_data.py      # General script to format data for SFT with various options
+│   └── run_sft.py                      # Script to run QLoRA SFT
+├── service/                   # Service modules for prediction, reflection, and scoring
+│   ├── prediction_service.py        # Service for generating predictions & initial thought processes
+│   ├── reflection_service.py        # Service for generating reflections & improved thought processes
+│   └── scoring_service.py           # Service for generating scored & improved thought processes
+├── README.md
+└── ... (Other files)
+``` 

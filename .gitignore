@@ -3,3 +3,10 @@
 *.xml
 *.iml
 /venv/
+
+# Ignore log contents but keep the directory structure
+logs/*
+!logs/.gitkeep
+!logs/thoughts/.gitkeep
+!logs/reflections/.gitkeep
+!logs/score/.gitkeep

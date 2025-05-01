@@ -130,14 +130,14 @@ def handle_score_error(error: Exception, score: Any) -> Tuple[None, str]:
     return None, f"Invalid score: '{score}'. Regenerate your response to my last prompt, but this time ensure that the 'score' field contains a value between 0 and 5 only."
 
 
-def handle_thoughts_error(error: Exception) -> Tuple[None, str]:
+def handle_thought_process_error(error: Exception) -> Tuple[None, str]:
     """
-    Returns error-specific prompts to regenerate response for thoughts errors.
+    Returns error-specific prompts to regenerate response for thought process errors.
     
     Args:
-        error: The exception object representing the thoughts error
+        error: The exception object representing the thought process error
         
     Returns:
         Tuple containing None and the corresponding error message
     """
-    return None, "Invalid improved_thoughts. Regenerate your response, ensuring that the 'improved_thoughts' field is present and contains valid text." 
+    return None, "Invalid improved_thought_process. Regenerate your response, ensuring that the 'improved_thought_process' field is present and contains valid text." 

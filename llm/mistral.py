@@ -10,6 +10,27 @@ class Mistral(BaseLLM):
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}"
         }
+        self.messages = []
+
+    def add_message(self, role: str, content: str):
+        """Adds a single message to the conversation history."""
+        self.messages.append(self.prompt_template(role, content))
+
+    def add_messages(self, messages: list):
+        """Adds multiple messages to the conversation history."""
+        for message in messages:
+            if isinstance(message, dict) and 'role' in message and 'content' in message:
+                self.messages.append(message)
+            else:
+                raise ValueError("Each message must be a dictionary with 'role' and 'content' keys")
+
+    def get_messages(self) -> list:
+        """Returns the current conversation history."""
+        return self.messages
+
+    def reset_messages(self):
+        """Clears the conversation history."""
+        self.messages = []
 
     def get_models(self):
         response = requests.get(self.api_url + "models", headers=self.headers)

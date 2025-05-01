@@ -1,139 +1,443 @@
+#!/usr/bin/env python3
 import pandas as pd
 import sys
 import argparse
 import os
+import json
+import time
+import multiprocessing
+from multiprocessing import Manager, Lock
+from concurrent.futures import ProcessPoolExecutor
+from functools import partial
+import math
+import logging
+import threading
+import csv
+import pathlib
 
-# --- Add project root to sys.path --- Added ---
+# --- Add project root to sys.path ---
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 # ------------------------------------
 
+# --- Import get_prompt function ---
+from prompts import get_prompt
+# --------------------
+
 from service.prediction_service import predict_label
-from llm.mistral import Mistral
 from dotenv import load_dotenv
-import json
+
+# Create logs directory if it doesn't exist
+os.makedirs(os.path.join(os.path.dirname(__file__), '..', 'logs', 'thoughts'), exist_ok=True)
+log_file = os.path.join(os.path.dirname(__file__), '..', 'logs', 'thoughts', 'generation.log')
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(log_file),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # --- Argument Parsing ---
-parser = argparse.ArgumentParser(description='Generate Chain-of-Thought augmentations for NLI examples.')
-parser.add_argument('--input-csv', type=str, required=True, help='Path to the input CSV file containing premise, hypothesis, label, and id.')
-parser.add_argument('--output-json', type=str, required=True, help='Path to the output JSON file where results will be appended.')
-parser.add_argument('--model-name', type=str, default='open-mistral-7b', help='Name of the Mistral model to use.')
+parser = argparse.ArgumentParser(description='Generate Chain-of-Thought augmentations for NLI examples using any supported model API.')
+parser.add_argument('--input-csv', type=str, default='data/original_data/sample.csv', help='Path to the input CSV file containing premise, hypothesis, label, and id. Defaults to sample.csv.')
+parser.add_argument('--output-json', type=str, help='Path to the output JSON file where results will be appended. If not specified, will be auto-generated based on model and input file.')
+parser.add_argument('--failed-csv', type=str, help='Path to save details of failed examples. If not specified, will be auto-generated.')
+parser.add_argument('--api', type=str, choices=['mistral', 'deepseek'], required=True, help='Which API to use (mistral or deepseek).')
+parser.add_argument('--model-name', type=str, help='Name of the model to use. Defaults depend on the API selected.')
+parser.add_argument('--workers', type=int, default=1, help='Number of worker processes. Default is 1 (single process).')
 parser.add_argument('--start-index', type=int, default=0, help='Start processing from this index in the input CSV.')
 parser.add_argument('--end-index', type=int, default=None, help='Stop processing at this index (exclusive) in the input CSV.')
+parser.add_argument('--system-prompt', type=str, default='initial_generation', choices=['initial_generation'], help='Which system prompt to use from prompts.py')
 args = parser.parse_args()
-# --- End Argument Parsing ---
 
+# Set default model names based on API
+if args.model_name is None:
+    if args.api == 'mistral':
+        args.model_name = 'open-mistral-7b'
+    elif args.api == 'deepseek':
+        args.model_name = 'deepseek-chat'  # Default DeepSeek model
 
-# -- Load data from specified CSV ---
-try:
-    input_df = pd.read_csv(args.input_csv)
-    # Ensure required columns exist
-    required_cols = ['id', 'premise', 'hypothesis', 'label']
-    if not all(col in input_df.columns for col in required_cols):
-        raise ValueError(f"Input CSV must contain columns: {', '.join(required_cols)}")
-except FileNotFoundError:
-    print(f"Error: Input file not found at {args.input_csv}")
-    sys.exit(1)
-except ValueError as e:
-    print(f"Error reading input CSV: {e}")
-    sys.exit(1)
+# Generate default output paths if not provided
+if not args.output_json:
+    input_base = os.path.basename(args.input_csv).split('.')[0]
+    # Use data directory structure
+    args.output_json = os.path.join('data', 'original_thoughts', f"{args.model_name}_{input_base}_{args.system_prompt}_output.json")
+    logger.info(f"Output file not specified, using: {args.output_json}")
 
-# --- Slice the dataframe based on start/end indices ---
-if args.end_index is None:
-    args.end_index = len(input_df)
-processing_df = input_df.iloc[args.start_index:args.end_index]
+if not args.failed_csv:
+    # Use data directory structure
+    args.failed_csv = os.path.join('data', 'original_thoughts', f"failed_{args.api}_{args.model_name}_{args.system_prompt}_generation.csv")
+    logger.info(f"Failed examples file not specified, using: {args.failed_csv}")
 
-# remove 8th row
-# train = train.drop(8)
-# add ID column
-# train['id'] = train.index
-# randomly sample 50 rows
-# train_sample = train.sample(n=25, random_state=1)
+def write_failed_example(file_path, lock, example_data):
+    """Append a failed example to the CSV file, ensuring thread/process safety."""
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    
+    with lock:
+        file_exists = os.path.isfile(file_path)
+        with open(file_path, 'a', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=['id', 'premise', 'hypothesis', 'true_label', 'error_info'])
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow(example_data)
 
-# Define Prompt
-json_schema = {
-    "thought_process": "<deductive/common-sense reasoning steps>",
-    "label": "<0 or 1>"
-}
+def get_llm_instance(api_name, api_key, model_name=None):
+    """Create and return an LLM instance based on the specified API"""
+    if api_name == 'mistral':
+        from llm.mistral import Mistral
+        return Mistral(api_key)
+    elif api_name == 'deepseek':
+        from llm.deepseek_api import DeepSeekAPI
+        # For DeepSeek, we need to pass the model name to get the appropriate model instance
+        valid_deepseek_models = ['deepseek-chat', 'deepseek-reasoner']
+        if model_name not in valid_deepseek_models and model_name is not None:
+            logger.warning(f"Unknown DeepSeek model: {model_name}. Using default 'deepseek-chat'.")
+            model_name = 'deepseek-chat'
+        return DeepSeekAPI(api_key=api_key, model=model_name)
+    else:
+        raise ValueError(f"Unsupported API: {api_name}")
 
-system_prompt = """You are an expert in natural language reasoning and inference. Your task is to analyze pairs of sentences and determine if the second sentence (hypothesis) can be logically inferred from the first sentence (premise).
+def process_chunk(chunk_df, api_name, api_key, model_name, output_json, failed_csv_path, failed_lock, worker_id, results_dict, prompt_type='initial_generation'):
+    """Process a chunk of examples using a single worker"""
+    logger.info(f"Worker {worker_id} starting to process {len(chunk_df)} examples")
+    
+    output_count = 0
+    correct_count = 0
+    failure_count = 0
+    
+    for index, row in chunk_df.iterrows():
+        logger.info(f"Worker {worker_id} - Processing ID: {row['id']} (Index: {index})...")
+        process_result = process_single_example(
+            row, index, api_name, api_key, model_name,
+            output_json, failed_csv_path, failed_lock, worker_id, results_dict,
+            prompt_type
+        )
+        
+        # Update counters
+        if process_result['success']:
+            output_count += 1
+            if process_result['correct']:
+                correct_count += 1
+        else:
+            failure_count += 1
+    
+    logger.info(f"Worker {worker_id} finished. Processed {output_count} examples, {correct_count} correct, {failure_count} failures.")
+    return {
+        'worker_id': worker_id,
+        'output_count': output_count,
+        'correct_count': correct_count,
+        'failure_count': failure_count
+    }
 
-For each example, I will provide the premise and hypothesis. Your response should be in the following JSON format:
-{
-    "thought_process": "Step 1. <Identify key information and relationships in the premise, considering logical connections, commonsense understanding, and factual consistency>. Step 2. <Analyze how the hypothesis relates to or contradicts the premise based on the information identified in Step 1. Evaluate if the hypothesis can be reasonably inferred from the premise>. Step 3. <Explain your final reasoning and conclusion on whether the hypothesis is entailed by the premise or not>",
-    "label": "<0 for no entailment, 1 for entailment>"
-}
-Please provide a clear multi-step reasoning chain explaining how you arrived at your final answer, breaking it down into logical components. Ground your response in the given information, logical principles and common-sense reasoning.
-
-Example:
-Premise: The dog chased the cat up the tree. Hypothesis: The cat climbed the tree.
-
-Your response:
-{
-  "thought_process": "Step 1: the premise indicates a scenario where a dog chases a cat, resulting in the cat moving up a tree. The movement 'up the tree' suggests a vertical ascent, typical of climbing behavior. It is common sense that a cat would climb a tree to escape a chasing dog, and there are no known facts that contradict the premise or hypothesis. Step 2: 'The cat climbed the tree' can be logically inferred from the premise because the action of climbing is a reasonable and necessary part of the cat moving 'up the tree' as described. Thus, the hypothesis logically follows from the premise. Step 3: Based on the logical reasoning, common sense, and lack of contradictory facts, the hypothesis can be inferred from the premise.",
-  "label": 1
-}
-"""
-
-load_dotenv()
-api_key = os.getenv('MISTRAL_API_KEY')
-if not api_key:
-    print("Error: MISTRAL_API_KEY not found in environment variables.")
-    sys.exit(1)
-
-print(f"Processing {len(processing_df)} examples from index {args.start_index} to {args.end_index}...")
-llm = Mistral(api_key)
-
-# --- Process rows and append to output JSON ---
-output_count = 0
-correct_count = 0
-with open(args.output_json, "a") as outfile: # Open in append mode
-    for index, row in processing_df.iterrows():
-        print(f"Processing ID: {row['id']} (Index: {index})...")
-
+def process_single_example(row, index, api_name, api_key, model_name, output_json, failed_csv_path, failed_lock, worker_id, results_dict, prompt_type='initial_generation'):
+    """Process a single example and return success/failure status"""
+    try:
+        # Create a fresh LLM instance for each example to avoid context sharing
+        llm = get_llm_instance(api_name, api_key, model_name)
+        
+        # Get the prompt and schema using get_prompt
+        prompt, schema = get_prompt(prompt_type)
+        
+        # Format the regeneration prompt template if needed
+        if prompt_type == 'regeneration':
+            # Format the regeneration prompt template
+            prompt = prompt.format(
+                premise=row['premise'],
+                hypothesis=row['hypothesis'],
+                true_label=row['true_label']
+            )
+        
         response_json = predict_label(
             id=row['id'],
-            sys=system_prompt, # System prompt defined above
+            sys=prompt,
             premise=row['premise'],
             hypothesis=row['hypothesis'],
-            true_label=row['label'],
+            true_label=row['true_label'],
             llm=llm,
-            model_name=args.model_name,
-            json_format=json_schema,
-            json_filepath=args.output_json # Pass output path for internal logging if needed
+            model_name=model_name,
+            json_format=schema,
+            json_filepath=output_json  # This will be used internally by predict_label
         )
-        # Append the result to the output file
-        if response_json and 'label' in response_json and response_json['label'] != -1: # Check for valid response
-             json.dump(response_json, outfile)
-             outfile.write('\n')
-             output_count += 1
-             # Track if prediction is correct
-             if response_json['label'] == row['label']:
-                 correct_count += 1
+        
+        # Check for valid response
+        if response_json and 'predicted_label' in response_json and response_json['predicted_label'] != -1:
+            # Append the result to our shared dictionary if in parallel mode
+            if results_dict is not None:
+                results_dict[str(index)] = {
+                    'response': response_json,
+                    'correct': response_json['predicted_label'] == row['true_label'],
+                    'id': row['id']
+                }
+            
+            return {
+                'success': True, 
+                'correct': response_json['predicted_label'] == row['true_label']
+            }
         else:
-            print(f"Warning: Failed to process ID: {row['id']}. Response: {response_json}")
+            logger.warning(f"Worker {worker_id} - Failed to process ID: {row['id']}. Response: {response_json}")
+            failed_data = {
+                'id': row['id'],
+                'premise': row['premise'],
+                'hypothesis': row['hypothesis'],
+                'true_label': row['true_label'],
+                'error_info': f"Invalid response: {response_json}"
+            }
+            write_failed_example(failed_csv_path, failed_lock, failed_data)
+            return {'success': False, 'correct': False}
 
-print(f"Finished processing. Appended {output_count} valid results to {args.output_json}")
+    except Exception as e:
+        logger.error(f"Worker {worker_id} - Error processing ID: {row['id']}: {str(e)}")
+        failed_data = {
+            'id': row['id'],
+            'premise': row['premise'],
+            'hypothesis': row['hypothesis'],
+            'true_label': row['true_label'],
+            'error_info': str(e)
+        }
+        write_failed_example(failed_csv_path, failed_lock, failed_data)
+        return {'success': False, 'correct': False}
 
-# Calculate and print accuracy metrics
-if output_count > 0:
-    accuracy = (correct_count / output_count) * 100
-    print(f"\nResults Summary (Shared Context):")
-    print(f"Total examples processed: {output_count}")
-    print(f"Correct predictions: {correct_count}")
-    print(f"Accuracy: {accuracy:.2f}%")
+def main():
+    # Load environment variables (for API key)
+    load_dotenv()
     
-    # Save summary to a file
-    summary_file_path = f"{args.output_json}_summary.txt"
-    with open(summary_file_path, "w") as summary_file:
-        summary_file.write(f"Results Summary (Shared Context):\n")
-        summary_file.write(f"Total examples processed: {output_count}\n")
-        summary_file.write(f"Correct predictions: {correct_count}\n")
-        summary_file.write(f"Accuracy: {accuracy:.2f}%\n")
+    # Get appropriate API key based on selected API
+    api_key = None
+    if args.api == 'mistral':
+        api_key = os.getenv('MISTRAL_API_KEY')
+        if not api_key:
+            logger.error("Error: MISTRAL_API_KEY not found in environment variables.")
+            sys.exit(1)
+    elif args.api == 'deepseek':
+        api_key = os.getenv('DEEPSEEK_API_KEY')
+        if not api_key:
+            logger.error("Error: DEEPSEEK_API_KEY not found in environment variables.")
+            sys.exit(1)
     
-    print(f"Summary saved to {summary_file_path}")
-else:
-    print("No valid predictions were made.")
+    # Load dataset
+    try:
+        input_df = pd.read_csv(args.input_csv)
+        
+        # Add id column if it doesn't exist
+        if 'id' not in input_df.columns:
+            logger.info("'id' column not found in input CSV. Adding 'id' column based on index.")
+            input_df['id'] = input_df.index
+        
+        # Ensure required columns exist
+        required_cols = ['premise', 'hypothesis', 'label']
+        if not all(col in input_df.columns for col in required_cols):
+            raise ValueError(f"Input CSV must contain columns: {', '.join(required_cols)}")
+        
+        # Rename 'label' to 'true_label' for consistency
+        if 'label' in input_df.columns:
+            input_df['true_label'] = input_df['label']
+        
+    except FileNotFoundError:
+        logger.error(f"Error: Input file not found at {args.input_csv}")
+        sys.exit(1)
+    except ValueError as e:
+        logger.error(f"Error reading input CSV: {e}")
+        sys.exit(1)
+    
+    # Slice the dataframe based on start/end indices
+    if args.end_index is None:
+        args.end_index = len(input_df)
+    processing_df = input_df.iloc[args.start_index:args.end_index]
+    
+    logger.info(f"Loaded {len(processing_df)} examples from {args.input_csv}")
+    
+    # Prepare failed examples file (delete if exists)
+    if os.path.exists(args.failed_csv):
+        os.remove(args.failed_csv)
+        logger.info(f"Removed existing failed examples file: {args.failed_csv}")
+    
+    # Ensure output directory exists
+    output_dir = os.path.dirname(args.output_json)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        logger.info(f"Created output directory: {output_dir}")
+    
+    # Single worker mode (simple sequential processing)
+    if args.workers == 1:
+        logger.info("Running in single worker mode")
+        
+        # Get the prompt and schema using get_prompt
+        prompt, schema = get_prompt(args.system_prompt)
+        
+        # Process examples sequentially
+        output_count = 0
+        correct_count = 0
+        with open(args.output_json, "a") as outfile:  # Open in append mode
+            for index, row in processing_df.iterrows():
+                logger.info(f"Processing ID: {row['id']} (Index: {index})...")
+                
+                # Create a fresh LLM instance for each example
+                llm = get_llm_instance(args.api, api_key, args.model_name)
+                
+                try:
+                    # Handle special formatting for regeneration prompt type
+                    current_prompt = prompt
+                    
+                    if args.system_prompt == 'regeneration':
+                        # Format the regeneration prompt
+                        current_prompt = prompt.format(
+                            premise=row['premise'],
+                            hypothesis=row['hypothesis'],
+                            true_label=row['true_label']
+                        )
+                    
+                    response_json = predict_label(
+                        id=row['id'],
+                        sys=current_prompt,
+                        premise=row['premise'],
+                        hypothesis=row['hypothesis'],
+                        true_label=row['true_label'],
+                        llm=llm,
+                        model_name=args.model_name,
+                        json_format=schema,
+                        json_filepath=args.output_json
+                    )
+                    
+                    # Check for valid response and write to output file
+                    if response_json and 'predicted_label' in response_json and response_json['predicted_label'] != -1:
+                        json.dump(response_json, outfile)
+                        outfile.write('\n')
+                        output_count += 1
+                        if response_json['predicted_label'] == row['true_label']:
+                            correct_count += 1
+                    else:
+                        logger.warning(f"Failed to process ID: {row['id']}. Response: {response_json}")
+                        failed_data = {
+                            'id': row['id'],
+                            'premise': row['premise'],
+                            'hypothesis': row['hypothesis'],
+                            'true_label': row['true_label'],
+                            'error_info': f"Invalid response: {response_json}"
+                        }
+                        # Create a dummy lock for single-threaded mode
+                        dummy_lock = threading.Lock()
+                        write_failed_example(args.failed_csv, dummy_lock, failed_data)
+                
+                except Exception as e:
+                    logger.error(f"Error processing ID: {row['id']}: {str(e)}")
+                    failed_data = {
+                        'id': row['id'],
+                        'premise': row['premise'],
+                        'hypothesis': row['hypothesis'],
+                        'true_label': row['true_label'],
+                        'error_info': str(e)
+                    }
+                    # Create a dummy lock for single-threaded mode
+                    dummy_lock = threading.Lock()
+                    write_failed_example(args.failed_csv, dummy_lock, failed_data)
+        
+        # Calculate statistics
+        if output_count > 0:
+            accuracy = (correct_count / output_count) * 100
+        else:
+            accuracy = 0
+            
+        # Print and save summary
+        logger.info(f"Finished processing. Successfully processed {output_count} examples with accuracy {accuracy:.2f}%")
+        
+        # Save summary to a file
+        summary_file_path = f"{args.output_json}_summary.txt"
+        with open(summary_file_path, "w") as summary_file:
+            summary_file.write(f"Results Summary (Single Process - {args.api}/{args.model_name}):\n")
+            summary_file.write(f"System Prompt: {args.system_prompt}\n")
+            summary_file.write(f"Total examples attempted: {len(processing_df)}\n")
+            summary_file.write(f"Total examples processed successfully: {output_count}\n")
+            summary_file.write(f"Correct predictions: {correct_count}\n")
+            summary_file.write(f"Accuracy: {accuracy:.2f}%\n")
+        
+        logger.info(f"Summary saved to {summary_file_path}")
+        
+    # Multi-worker mode (parallel processing)
+    else:
+        logger.info(f"Running in parallel mode with {args.workers} workers")
+        
+        # Calculate chunk size based on number of workers
+        num_workers = args.workers
+        chunk_size = math.ceil(len(processing_df) / num_workers)
+        
+        # Create a shared manager and lock for writing to the failed CSV
+        manager = Manager()
+        results_dict = manager.dict()
+        failed_lock = manager.Lock()
+        
+        # Create chunks of data for each worker
+        chunks = [processing_df.iloc[i:i+chunk_size] for i in range(0, len(processing_df), chunk_size)]
+        
+        # Process chunks in parallel
+        start_time = time.time()
+        worker_results = []
+        
+        with ProcessPoolExecutor(max_workers=num_workers) as executor:
+            futures = []
+            for i, chunk in enumerate(chunks):
+                future = executor.submit(
+                    process_chunk,
+                    chunk_df=chunk,
+                    api_name=args.api,
+                    api_key=api_key,
+                    model_name=args.model_name,
+                    output_json=args.output_json,
+                    failed_csv_path=args.failed_csv,
+                    failed_lock=failed_lock,
+                    worker_id=i,
+                    results_dict=results_dict,
+                    prompt_type=args.system_prompt
+                )
+                futures.append(future)
+                
+            for future in futures:
+                worker_results.append(future.result())
+        
+        # Write all results to the output file (ensure sorted by index for consistency)
+        sorted_indices = sorted(results_dict.keys(), key=int)
+        with open(args.output_json, "a") as outfile:
+            for index_str in sorted_indices:
+                # Ensure we have the response key before dumping
+                if 'response' in results_dict[index_str]:
+                    json.dump(results_dict[index_str]['response'], outfile)
+                    outfile.write('\n')
+                else:
+                    logger.error(f"Missing 'response' key for index {index_str} in results_dict")
+        
+        # Calculate overall statistics
+        total_output = sum(result['output_count'] for result in worker_results)
+        total_correct = sum(result['correct_count'] for result in worker_results)
+        total_failed = sum(result['failure_count'] for result in worker_results)
+        accuracy = (total_correct / total_output * 100) if total_output > 0 else 0
+        
+        # Save summary to a file
+        summary_file_path = f"{args.output_json}_summary.txt"
+        with open(summary_file_path, "w") as summary_file:
+            summary_file.write(f"Results Summary (Parallel Processing - {num_workers} workers, {args.api}/{args.model_name}):\n")
+            summary_file.write(f"System Prompt: {args.system_prompt}\n")
+            summary_file.write(f"Total examples attempted: {len(processing_df)}\n")
+            summary_file.write(f"Total examples processed successfully: {total_output}\n")
+            summary_file.write(f"Total examples failed: {total_failed}\n")
+            summary_file.write(f"Correct predictions (on successful): {total_correct}\n")
+            summary_file.write(f"Accuracy (on successful): {accuracy:.2f}%\n")
+            summary_file.write(f"Processing time: {time.time() - start_time:.2f} seconds\n")
+            
+            # Add per-worker statistics
+            summary_file.write("\nPer-worker statistics:\n")
+            for result in worker_results:
+                worker_accuracy = (result['correct_count'] / result['output_count'] * 100) if result['output_count'] > 0 else 0
+                summary_file.write(f"Worker {result['worker_id']}: {result['output_count']} successful, {result['failure_count']} failed, {result['correct_count']} correct ({worker_accuracy:.2f}% accuracy)\n")
+        
+        logger.info(f"Finished processing. Results saved to {args.output_json}")
+        logger.info(f"Failed examples saved to {args.failed_csv} ({total_failed} failures)")
+        logger.info(f"Summary saved to {summary_file_path}")
+        logger.info(f"Processed {total_output} examples successfully with accuracy {accuracy:.2f}%")
+        logger.info(f"Total processing time: {time.time() - start_time:.2f} seconds")
 
-# train['response_json'].iloc[start_index:end_index] = train.iloc[start_index:end_index].apply(lambda x: predict_label(...), axis=1)
-
-# train.to_csv(f'data/thoughts_{start_index}_{end_index}.csv', index=False)
+if __name__ == "__main__":
+    main()
