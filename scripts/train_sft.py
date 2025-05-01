@@ -134,15 +134,23 @@ def main():
     # 2. Load Tokenizer
     logger.info(f"Loading tokenizer for {args.model_id}...")
     tokenizer = AutoTokenizer.from_pretrained(args.model_id, trust_remote_code=True)
-    tokenizer.padding_side = 'right'
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-        logger.info("Set pad_token to eos_token")
-        
-    # Configure tokenizer padding strategy
-    tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.padding_side = "right"
     
+    # --- FIX: Add new pad token ---
+    if tokenizer.pad_token is None:
+        logger.info("Adding new pad token '[PAD]'")
+        # Add the token. `special_tokens_map.json` in the save dir will be updated.
+        tokenizer.add_special_tokens({'pad_token': '[PAD]'}) 
+        # Keep the pad_token_id consistent if the tokenizer already assigned one after adding.
+        # Otherwise, use the one from the added token.
+        tokenizer.pad_token_id = tokenizer.convert_tokens_to_ids(tokenizer.pad_token)
+        logger.info(f"Set pad_token to {tokenizer.pad_token} (ID: {tokenizer.pad_token_id})")
+    else:
+         logger.info(f"Using existing pad_token: {tokenizer.pad_token} (ID: {tokenizer.pad_token_id})")
+    # --- END FIX ---
+
+    tokenizer.padding_side = 'right' # Ensure padding side is set AFTER potentially adding the token
+    # Note: No longer setting pad_token = eos_token here
+
     # Helper function for dataset processing to ensure consistent lengths
     def preprocess_function(examples):
         # Don't return tensors from the tokenizer in preprocessing
@@ -197,6 +205,21 @@ def main():
             trust_remote_code=True,
         )
         logger.info(f"Model loaded onto device: {model.device}")
+
+        # --- FIX: Resize embeddings ---
+        logger.info(f"Resizing token embeddings to match tokenizer size ({len(tokenizer)})")
+        model.resize_token_embeddings(len(tokenizer))
+        # Check if the pad token embedding needs initialization (optional but good practice)
+        # if model.get_input_embeddings().weight.shape[0] != len(tokenizer):
+        #     logger.error("Embedding size mismatch after resize!")
+        # Update vocab_size in config
+        model.config.vocab_size = len(tokenizer)
+        # Ensure the new pad token ID is used if resizing happened
+        if hasattr(tokenizer, 'pad_token_id'):
+             model.config.pad_token_id = tokenizer.pad_token_id
+             logger.info(f"Set model config pad_token_id to: {model.config.pad_token_id}")
+        # --- END FIX ---
+
     except Exception as e:
         logger.error(f"Failed to load model: {e}")
         logger.error("Check CUDA setup, GPU memory, and model ID.")
@@ -222,6 +245,12 @@ def main():
 
     # Ensure lm_head is compatible - crucial for preventing dtype errors
     if hasattr(model, 'lm_head'):
+        if model.lm_head.out_features != len(tokenizer):
+            logger.warning(f"lm_head output features ({model.lm_head.out_features}) mismatch tokenizer size ({len(tokenizer)}). Resizing lm_head...")
+            model.lm_head = nn.Linear(model.config.hidden_size, len(tokenizer), bias=False)
+            # Consider initializing new lm_head weights if needed
+            logger.info(f"lm_head resized to output features: {model.lm_head.out_features}")
+
         if model.lm_head.weight.dtype != compute_dtype:
             logger.warning(f"lm_head dtype ({model.lm_head.weight.dtype}) doesn't match compute_dtype ({compute_dtype}). Casting...")
             # More thorough casting of the lm_head

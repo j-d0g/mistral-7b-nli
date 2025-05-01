@@ -25,7 +25,7 @@ docker run --rm --gpus device=0 \
   -v $(pwd)/results:/app/results \
   -w /app \
   mistral-nli-ft \
-  python run_inference.py \
+  python sample_model.py \
   --model_id "$MODEL_ID" \
   --batch_size $BATCH_SIZE \
   --max_length $MAX_LENGTH \

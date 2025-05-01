@@ -103,54 +103,80 @@ Hypothesis: {hypothesis} [/INST]"""
     return prompt
 
 def extract_prediction(output_text, use_cot=False):
-    """Extract the prediction (0 or 1) from the model's output text."""
-    try:
-        # Try to find and parse a JSON object in the output
-        output_text = output_text.strip()
-        
-        # Find json-like content
-        start_idx = output_text.find('{')
-        end_idx = output_text.rfind('}') + 1
-        
-        if start_idx >= 0 and end_idx > start_idx:
-            json_text = output_text[start_idx:end_idx]
+    """Extract the prediction (0 or 1) from the model's output text using improved extraction logic."""
+    output_text = output_text.strip()
+    
+    # Look for JSON objects - prioritize the one with "predicted_label"
+    json_texts = []
+    depth = 0
+    start_idx = -1
+    
+    # Find all potential JSON objects
+    for i, char in enumerate(output_text):
+        if char == '{':
+            if depth == 0:
+                start_idx = i
+            depth += 1
+        elif char == '}':
+            depth -= 1
+            if depth == 0 and start_idx != -1:
+                json_texts.append(output_text[start_idx:i+1])
+    
+    # Try each JSON object, prioritizing those with the expected keys
+    for json_text in json_texts:
+        try:
             response_dict = json.loads(json_text)
             
-            # Extract the label from the response, checking all possible field names
+            # Check for predicted_label first, then label
             if 'predicted_label' in response_dict:
-                # This is the primary field name for Chain-of-Thought results
                 label_value = response_dict['predicted_label']
             elif 'label' in response_dict:
-                # This is a fallback field name
                 label_value = response_dict['label']
             else:
-                raise ValueError("No label field found in JSON")
-                
-            # Convert label to integer if it's a string
+                continue  # Skip this JSON if it doesn't have either key
+            
+            # Handle string or number
             if isinstance(label_value, str):
-                # Try to extract a number from the string
-                if '0' in label_value and '1' not in label_value:
+                # For strings, do targeted extraction
+                if label_value == "0" or label_value == "no entailment" or label_value.lower() == "false":
                     return 0
-                elif '1' in label_value and '0' not in label_value:
+                elif label_value == "1" or label_value == "entailment" or label_value.lower() == "true":
                     return 1
-                else:
-                    # Try to convert directly
+                try:
                     return int(label_value)
+                except:
+                    # If we can't parse directly, continue to the next JSON
+                    continue
             else:
-                # Already a number
+                # For numbers, convert to int
                 return int(label_value)
-        
-        # If we couldn't parse JSON or find the label, check for direct "0" or "1" in the text
-        if '0' in output_text and '1' not in output_text:
-            return 0
-        elif '1' in output_text and '0' not in output_text:
-            return 1
-    except Exception as e:
-        print(f"Error extracting prediction: {e}")
-        print(f"Output text: {output_text}")
+        except:
+            # If this JSON fails, try the next one
+            continue
     
-    # Default fallback - predict the majority class (analyze your dataset to determine this)
-    return 1  # Assuming 1 is the majority class, adjust if needed
+    # If no valid JSON with label found, check for explicit label statements in text
+    lower_text = output_text.lower()
+    if "final label: 0" in lower_text or "final prediction: 0" in lower_text:
+        return 0
+    if "final label: 1" in lower_text or "final prediction: 1" in lower_text:
+        return 1
+        
+    # Only if nothing better is found, check for conclusion statements
+    if "not entailed" in lower_text or "no entailment" in lower_text:
+        return 0
+    if "is entailed" in lower_text or "entailment" in lower_text:
+        return 1
+    
+    # For CoT reasoning, try to extract from "step 3" conclusion
+    if use_cot and "step 3" in lower_text:
+        step3_text = lower_text.split("step 3")[1].split("step 4")[0].split("\n\n")[0]
+        if "not entailed" in step3_text or "no entailment" in step3_text:
+            return 0
+        if "is entailed" in step3_text or "entailment" in step3_text:
+            return 1
+    
+    # Default fallback to the majority class (for NLI datasets, often label 1)
+    return 1
 
 def prepare_model_and_tokenizer(model_id, gpu_id=0):
     """Prepare the model and tokenizer with 4-bit quantization."""

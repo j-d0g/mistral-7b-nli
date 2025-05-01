@@ -2,12 +2,12 @@
 
 # Ensure necessary directories exist
 mkdir -p hf_cache
-mkdir -p models/mistral-7b-nli-cot-ablation2
+mkdir -p models/mistral-7b-nli-cot-ablation1
 
 # Make the training script executable
 chmod +x scripts/train_sft.py
 
-echo "Running Mistral-7B fine-tuning for Chain-of-Thought NLI (Ablation 2: Mixed Data Optimization)..."
+echo "Running Mistral-7B fine-tuning for Chain-of-Thought NLI (Ablation 1: Effective Batch Size 32)..."
 
 # Run the Docker container with the training script on GPU 1 only
 docker run --rm --gpus '"device=1"' \
@@ -16,12 +16,10 @@ docker run --rm --gpus '"device=1"' \
   --env-file .env \
   mistral-nli-ft \
   bash -c "pip install wandb && python scripts/train_sft.py \
-    --output_dir models/mistral-7b-nli-cot-ablation2 \
-    --batch_size 32 \
+    --output_dir models/mistral-7b-nli-cot-ablation1 \
+    --batch_size 16 \
     --grad_accumulation_steps 2 \
-    --learning_rate 1e-4 \
-    --warmup_ratio 0.1 \
-    --max_grad_norm 1.0 \
+    --warmup_ratio 0.05 \
     --num_epochs 3"
 
 echo "Training script execution finished." 

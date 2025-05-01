@@ -2,7 +2,7 @@
 
 # Ensure necessary directories exist
 mkdir -p hf_cache
-mkdir -p models/mistral-7b-nli-cot
+mkdir -p models/mistral-7b-nli-cot-ablation0-pt2
 
 # Make the training script executable
 chmod +x scripts/train_sft.py
@@ -15,6 +15,6 @@ docker run --rm --gpus '"device=1"' \
   -v $(pwd)/hf_cache:/root/.cache/huggingface \
   --env-file .env \
   mistral-nli-ft \
-  bash -c "pip install wandb && python scripts/train_sft.py"
+  bash -c "pip install wandb && python scripts/train_sft.py --num_epochs 2"
 
 echo "Training script execution finished." 

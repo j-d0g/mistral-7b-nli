@@ -135,7 +135,7 @@ For more detailed pipeline information and example commands, see [scripts/README
 ├── Dockerfile
 ├── requirements.txt
 ├── run_inference.sh            # Main script to run optimized inference on test set
-├── run_inference.py            # Optimized implementation of NLI inference with 4-bit quantization
+├── sample_model.py            # Optimized implementation of NLI inference with 4-bit quantization
 ├── prompts.py                  # Centralized prompt template definitions
 ├── data/
 │   ├── original_data/         # Original NLI datasets (CSV)
@@ -161,4 +161,37 @@ For more detailed pipeline information and example commands, see [scripts/README
 │   └── scoring_service.py           # Service for generating scored & improved thought processes
 ├── README.md
 └── ... (Other files)
-``` 
+```
+
+## Code Organization
+
+The codebase is organized into several key components:
+
+### Inference
+- `sample_model.py` - Main inference script for running models on test data
+- `prompts.py` - Contains prompts for the NLI task, including Chain-of-Thought templates
+
+### Prediction Parsing
+- `parse_predictions.py` - Core script for parsing structured predictions from model outputs
+- `parse_predictions_with_tracking.py` - Enhanced version that tracks extraction methods
+- `strict_evaluation.py` - Academic evaluation with strict parsing criteria
+
+### Analysis
+- `extraction_analysis.py` - Detailed analysis of extraction methods across models
+- `compare_fixed_results.py` - Compares results before and after improved extraction
+
+### Shell Scripts
+- `test_*.sh` - Scripts for running inference on different models/datasets
+- `analyze_extraction_methods.sh` - Script to run comprehensive extraction analysis
+
+### Extraction Logic
+
+All NLI models output their predictions in text format, which must be parsed to extract structured predictions (0/1 labels). The extraction logic follows this priority:
+
+1. Parse JSON objects with "predicted_label" or "label" fields
+2. Look for explicit statements like "final label: 0" 
+3. Search for conclusion statements like "is entailed" or "not entailed"
+4. For Chain-of-Thought outputs, check step 3 conclusions
+5. Default to the majority class (typically 1 for NLI)
+
+The improved extraction logic in `sample_model.py` and parsing scripts ensures accurate prediction extraction across different output formats, avoiding biases that could impact model evaluation. 
