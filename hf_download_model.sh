@@ -35,8 +35,16 @@ docker run --rm \
   -w /app \
   -e HF_TOKEN=$HF_TOKEN \
   -e SKIP_INFERENCE=1 \
+  -e RUNNING_IN_DOCKER=1 \
   mistral-nli-ft \
   python3 models/download_model.py
 
 echo "Done! Model files saved to models/mistral_thinking_abl2/"
-echo "To use these files for inference, you'll need to download the base model separately with your HF token." 
+echo "To use these files for inference, you'll need to download the base model separately with your HF token."
+
+# Clean up temporary files (may require sudo as they could be owned by root)
+if [ -d "temp_download" ]; then
+  echo "Cleaning up temporary directory..."
+  sudo rm -rf temp_download
+  echo "Temporary files removed."
+fi 

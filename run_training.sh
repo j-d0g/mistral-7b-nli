@@ -4,7 +4,7 @@
 # Passes all arguments directly to the Python training script
 
 # Default GPU ID is 0
-GPU_ID=1
+GPU_ID=0
 echo "Using GPU: $GPU_ID"
 
 # Run training in Docker
