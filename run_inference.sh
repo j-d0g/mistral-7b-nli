@@ -82,6 +82,7 @@ docker run --rm --gpus device=$GPU_ID \
   -v $(pwd)/results:/app/results \
   -v $(pwd)/models:/app/models \
   -w /app \
+  --env-file .env \
   mistral-nli-ft \
   python evaluate/sample_model.py \
   --model_id "$MODEL_PATH" \

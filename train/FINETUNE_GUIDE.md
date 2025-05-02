@@ -58,21 +58,51 @@ docker build -t mistral-nli-ft .
 # Create cache directory for HuggingFace
 mkdir -p hf_cache
 
-# Run the fine-tuning script
-docker run --rm --gpus all \
-  -v $(pwd):/app \
-  -v $(pwd)/hf_cache:/root/.cache/huggingface \
-  --env-file .env \
-  mistral-nli-ft \
-  python scripts/train_sft.py
+# Run the fine-tuning script with default configuration
+./train.sh
+
+# Run with a specific configuration file
+./train.sh --config train/configs/ablation1.py
+
+# Override specific parameters
+./train.sh --config train/configs/ablation1.py --batch_size 8 --learning_rate 1e-4
+
+# Specify GPU to use
+./train.sh --gpu_id 1
 ```
 
-**Note**: Create a `.env` file with your HuggingFace API token:
+**Note**: Create a `.env` file with your HuggingFace API token and WandB API key if using WandB:
 ```
 HF_TOKEN=your_huggingface_token_here
+WANDB_API_KEY=your_wandb_api_key_here
 ```
 
-## 2. Common Issues and Solutions
+## 2. Configuration System
+
+The training system uses a Python-based configuration approach:
+
+1. **Default Configuration**: `train/configs/default.py` contains sensible defaults
+2. **Custom Configurations**: Create specific config files for different experiments
+3. **Command-line Overrides**: CLI arguments always take highest precedence
+
+Example configuration file:
+```python
+"""
+Ablation Study Configuration - Higher learning rate
+"""
+
+# Import default configuration values
+from train.configs.default import *
+
+# Override specific parameters
+output_dir = "models/mistral-7b-nli-cot-ablation1"
+batch_size = 8
+grad_accumulation_steps = 4  # Effective batch size: 32
+learning_rate = 3e-4  # Higher learning rate
+num_epochs = 2  # More epochs
+```
+
+## 3. Common Issues and Solutions
 
 ### Dtype Mismatch Error with BF16 Precision
 
@@ -107,7 +137,7 @@ To enable memory-efficient training of large models on consumer hardware:
 3. Apply LoRA to specific attention layers (q_proj, k_proj, v_proj, o_proj)
 4. Force model loading onto a single GPU with appropriate device mapping
 
-## 3. Training Script With Optimized Parameters
+## 4. Training Script With Optimized Parameters
 
 The script below provides an optimized training setup for fine-tuning Mistral-7B on NLI tasks within a 9-hour timeframe:
 
@@ -378,33 +408,85 @@ The SFTTrainer will automatically log these metrics to WandB:
 
 If you want to track additional metrics specific to NLI tasks (accuracy, precision, recall), you can implement a custom `compute_metrics` function and pass it to the trainer.
 
-## 6. Quick Reference: Running the Complete Pipeline
+## 6. Config-Based Training System
+
+We've implemented a configuration-based training system for easier experimentation:
+
+### Configuration Files
+
+Our training system uses Python configuration files located in `train/configs/`:
+
+- `default.py`: Base configuration with defaults for all runs
+- `initial_test_run.py`: Configuration for the initial test run
+- `ablation1.py`: Configuration for Ablation 1 (standard training)
+- `ablation2.py`: Configuration for Ablation 2 (mixed data optimization)
+
+Each configuration file extends the default configuration by importing it and overriding specific parameters:
+
+```python
+# Import and extend defaults
+from train.configs.default import *
+
+# Override specific parameters
+output_dir = "models/mistral-7b-nli-cot-ablation1"
+batch_size = 16
+grad_accumulation_steps = 2  # Effective batch size: 32
+learning_rate = 2e-4
+warmup_ratio = 0.05  # 5% warmup
+
+# Wandb settings
+use_wandb = True
+wandb_project = "mistral7b_cot"
+wandb_name = "ablation1"
+
+# Hardware selection
+gpu_id = 1
+```
+
+### Running Training with Configurations
+
+Instead of directly running the Python script, use our wrapper `train.sh` which handles Docker orchestration and config loading:
+
+```bash
+# Run with default configuration
+./train.sh
+
+# Use a specific configuration file
+./train.sh --config train/configs/ablation1.py
+
+# Use ablation2 configuration on GPU 1
+./train.sh --config train/configs/ablation2.py --gpu 1
+
+# Override specific parameters
+./train.sh --config train/configs/ablation1.py --batch_size 8 --no_wandb
+```
+
+### Benefits of the Configuration System
+
+- **Declarative Configuration**: Parameters defined in clean Python files instead of bash scripts
+- **Intuitive Overrides**: Command-line parameters take precedence over config values
+- **Reduced Duplication**: Default values exist in only one place
+- **Self-Documenting Code**: Config files include comments and explanations
+- **Simplified Experimentation**: Create new configurations by copying and editing files
+- **Better Type Handling**: Proper typing of parameters (integers, floats, booleans)
+
+## 7. Quick Reference: Running the Complete Pipeline
 
 ```bash
 # Step 1: Build Docker image
 docker build -t mistral-nli-ft .
 
 # Step 2: Create directories
-mkdir -p hf_cache models/mistral-7b-nli-cot
+mkdir -p models/mistral-7b-nli-cot
 
-# Step 3: Run training
-docker run --rm --gpus all \
-  -v $(pwd):/app \
-  -v $(pwd)/hf_cache:/root/.cache/huggingface \
-  --env-file .env \
-  mistral-nli-ft \
-  python scripts/train_sft.py
+# Step 3: Run training with a specific configuration
+./train.sh --config train/configs/ablation2.py --gpu 1
 
-# Step 4: Run evaluation (after training)
-docker run --rm --gpus all \
-  -v $(pwd):/app \
-  -v $(pwd)/hf_cache:/root/.cache/huggingface \
-  --env-file .env \
-  mistral-nli-ft \
-  python scripts/evaluate.py --model_path models/mistral-7b-nli-cot --eval_file data/finetune/test_ft.jsonl
+# Step 4: Run inference/evaluation
+./evaluate/run_inference.sh --model models/mistral-7b-nli-cot-ablation2 --data data/finetune/test_ft.jsonl --gpu 1
 ```
 
-## 7. Troubleshooting Common Issues
+## 8. Troubleshooting Common Issues
 
 1. **OOM Errors**: If you encounter Out-of-Memory errors:
    - Reduce batch size

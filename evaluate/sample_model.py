@@ -18,6 +18,15 @@ import numpy as np
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from tqdm import tqdm
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score, confusion_matrix
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+HF_TOKEN = os.environ.get("HF_TOKEN")
+if not HF_TOKEN:
+    print("Warning: HF_TOKEN not found in environment variables. You may not be able to access gated models.")
+else:
+    print("Found HF_TOKEN in environment variables.")
 
 # Add project root to sys.path to allow importing prompts
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -231,14 +240,16 @@ def prepare_model_and_tokenizer(model_id, gpu_id=0):
                 base_model_name,
                 quantization_config=quantization_config,
                 device_map=device_map,
-                trust_remote_code=True
+                trust_remote_code=True,
+                token=HF_TOKEN  # Use HF_TOKEN for authentication
             )
             
             # Load tokenizer from the adapter path (it might have different vocab size)
             tokenizer = AutoTokenizer.from_pretrained(
                 model_id, # Use the checkpoint path for the tokenizer
                 use_fast=True,
-                padding_side="left"
+                padding_side="left",
+                token=HF_TOKEN  # Use HF_TOKEN for authentication
             )
 
             # Resize token embeddings if tokenizer vocab size differs from base model
@@ -258,12 +269,14 @@ def prepare_model_and_tokenizer(model_id, gpu_id=0):
                 model_id,
                 quantization_config=quantization_config,
                 device_map=device_map,
-                trust_remote_code=True
+                trust_remote_code=True,
+                token=HF_TOKEN  # Use HF_TOKEN for authentication
             )
             tokenizer = AutoTokenizer.from_pretrained(
                 model_id,
                 use_fast=True,
-                padding_side="left"
+                padding_side="left",
+                token=HF_TOKEN  # Use HF_TOKEN for authentication
             )
     else:
         # Load the model from Hugging Face with quantization
@@ -271,14 +284,16 @@ def prepare_model_and_tokenizer(model_id, gpu_id=0):
             model_id,
             quantization_config=quantization_config,
             device_map=device_map,
-            trust_remote_code=True
+            trust_remote_code=True,
+            token=HF_TOKEN  # Use HF_TOKEN for authentication
         )
         
         # Load the tokenizer
         tokenizer = AutoTokenizer.from_pretrained(
             model_id,
             use_fast=True,
-            padding_side="left"
+            padding_side="left",
+            token=HF_TOKEN  # Use HF_TOKEN for authentication
         )
     
     # Set padding token if not set
