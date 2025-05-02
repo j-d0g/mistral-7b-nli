@@ -17,8 +17,8 @@ COPY requirements.txt .
 # Using --no-cache-dir to reduce image size
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Add sentencepiece explicitly
-RUN pip install --no-cache-dir sentencepiece
+# Add additional packages - explicitly include scikit-learn
+RUN pip install --no-cache-dir sentencepiece wandb scikit-learn pandas numpy scipy joblib threadpoolctl
 
 # Copy the rest of the application code
 COPY . .

@@ -25,6 +25,7 @@ import os
 import re
 import argparse
 from collections import Counter, defaultdict
+from sklearn.metrics import classification_report, precision_recall_fscore_support
 
 def standard_extract_prediction(output_text, use_cot=False):
     """
@@ -275,204 +276,279 @@ def strict_extract_prediction(output_text):
     return None, "extraction_failure", False
 
 def reanalyze_results(input_file, output_file=None, use_cot=True, tracking=False, strict=False):
-    """
-    Re-analyze model outputs with selected extraction method and save updated results.
-    
-    Parameters:
-        input_file: Path to input JSON results file
-        output_file: Optional path to save updated results
-        use_cot: Enable CoT-specific extraction
-        tracking: Enable detailed method tracking
-        strict: Use strict academic evaluation
-    """
+    """Re-analyze an existing results file with different extraction options."""
     try:
         with open(input_file, 'r') as f:
             data = json.load(f)
     except Exception as e:
-        print(f"Error loading input file: {e}", file=sys.stderr)
-        return
-        
-    results = data.get('results', [])
-    print(f"Loaded {len(results)} results from {input_file}")
+        print(f"Error: Failed to load input file {input_file}: {e}")
+        return False
+
+    if 'results' not in data:
+        print(f"Error: Input file {input_file} does not have a 'results' field")
+        return False
+
+    # Extract only the metadata we want to keep
+    results = data.pop('results')  # Remove results temporarily
+    metadata = {k: v for k, v in data.items() if k in ['model', 'inference_time_seconds', 'samples_per_second', 'use_cot']}
     
-    # Track statistics
-    extraction_failures = 0
+    # Build a fresh data structure with just the metadata
+    data = metadata
+    
+    # Get the analysis method based on flags - only use one flag at a time
+    if strict:
+        extract_fn = strict_extract_prediction
+        tracking = False  # Disable tracking if strict is enabled
+    elif tracking:
+        extract_fn = tracking_extract_prediction
+    else:
+        extract_fn = standard_extract_prediction
+    
+    # Process and update each result
+    y_true = []
+    y_pred = []
+    method_counts = Counter()
+    method_counts_by_label = defaultdict(Counter)
+    strict_failures = 0
     prediction_changes = 0
-    correct_before = 0
-    correct_after = 0
-    
-    # Tracking-specific counters
-    if tracking or strict:
-        extraction_methods = Counter()
-        label_0_methods = Counter()
-        label_1_methods = Counter()
-        changes_1_to_0 = 0
-        changes_0_to_1 = 0
+    original_correct = 0
+    new_correct = 0
+    label_0_to_1 = 0
+    label_1_to_0 = 0
+    successful_extractions = 0
     
     # Process each result
-    for idx, result in enumerate(results):
-        original_pred = result.get('predicted_label', -999)
-        output_text = result.get('output', '')
-        true_label = result.get('true_label', -999)
-        
-        # Skip if missing essential data
-        if output_text == '' or true_label == -999:
-            print(f"Warning: Missing data in result {idx}")
+    for i, result in enumerate(results):
+        # Skip entries without outputs
+        if 'output' not in result:
             continue
-            
-        # Count correct predictions with original extraction method
-        if original_pred == true_label:
-            correct_before += 1
-            
-        # Apply selected extraction method
-        try:
-            if strict:
-                # Use strict academic extraction
-                new_pred, method_used, success = strict_extract_prediction(output_text)
-                if not success:
-                    extraction_failures += 1
-                    print(f"Strict extraction failure for example {idx}")
-                    # In strict mode, extraction failures are counted as incorrect
-                    new_pred = None
-                
-                if tracking or strict:
-                    extraction_methods[method_used] += 1
-                    
-            elif tracking:
-                # Use tracking extraction
-                new_pred, method_used = tracking_extract_prediction(output_text, use_cot)
-                
-            if new_pred == -1:
-                extraction_failures += 1
-                print(f"Extraction failure for example {idx}, keeping original prediction")
-                    new_pred = original_pred
-                
-                extraction_methods[method_used] += 1
-                
-                # Track methods by label
-                if new_pred == 0:
-                    label_0_methods[method_used] += 1
-                elif new_pred == 1:
-                    label_1_methods[method_used] += 1
-                
+        
+        # Get the original prediction
+        original_prediction = result.get('predicted_label', -1)
+        
+        # Has true label?
+        has_true_label = 'true_label' in result
+        if has_true_label:
+            true_label = result['true_label']
+            y_true.append(true_label)
+            if original_prediction == true_label:
+                original_correct += 1
+        
+        # Extract prediction using the selected method
+        if strict:
+            # Strict extraction returns (prediction, method, success)
+            new_prediction, method, success = extract_fn(result['output'])
+            if not success:
+                strict_failures += 1
+                print(f"Strict extraction failure for example {i}")
+                method = "extraction_failure"
+                if has_true_label:
+                    y_pred.append(-1)  # Mark as extraction failure
             else:
-                # Use standard extraction
-                new_pred = standard_extract_prediction(output_text, use_cot)
-                
-                if new_pred == -1:
-                    extraction_failures += 1
-                    print(f"Extraction failure for example {idx}, keeping original prediction")
-                    new_pred = original_pred
+                successful_extractions += 1
+                if has_true_label:
+                    y_pred.append(new_prediction)
+                    if new_prediction == true_label:
+                        new_correct += 1
             
-            # Track prediction changes
-            if new_pred != original_pred:
+            # Record method usage
+            method_counts[method] += 1
+            if has_true_label:
+                method_counts_by_label[true_label][method] += 1
+            
+            # Check for prediction changes
+            if original_prediction != new_prediction and new_prediction != -1:
                 prediction_changes += 1
+                print(f"Example {i}: Changed prediction from {original_prediction} to {new_prediction}, true label: {true_label if has_true_label else 'unknown'}")
                 
-                # Track direction of change for tracking mode
-                if tracking or strict:
-                    if original_pred == 1 and new_pred == 0:
-                        changes_1_to_0 += 1
-                    elif original_pred == 0 and new_pred == 1:
-                        changes_0_to_1 += 1
-                
-                print(f"Example {idx}: Changed prediction from {original_pred} to {new_pred}, true label: {true_label}")
-                
-            # Update the result
-            if new_pred is not None:  # Skip None predictions from strict mode
-            result['predicted_label'] = new_pred
-            result['correct'] = (new_pred == true_label)
+                # Track direction of change
+                if original_prediction == 0 and new_prediction == 1:
+                    label_0_to_1 += 1
+                elif original_prediction == 1 and new_prediction == 0:
+                    label_1_to_0 += 1
             
-                # Add method information for tracking mode
-                if tracking or strict:
-                    result['extraction_method'] = method_used
+            # Update the result with the new prediction
+            if success:
+                result['predicted_label'] = new_prediction
+                result['extraction_method'] = method
+            else:
+                # For strict mode, we keep the original prediction on extraction failure
+                result['extraction_method'] = "extraction_failure"
+        
+        elif tracking:
+            # Tracking extraction returns (prediction, method)
+            new_prediction, method = extract_fn(result['output'], use_cot)
             
-            # Count correct predictions with new extraction method
-            if new_pred == true_label:
-                correct_after += 1
-                
-        except Exception as e:
-            print(f"Error processing result {idx}: {e}", file=sys.stderr)
+            # Record method usage
+            method_counts[method] += 1
+            if has_true_label:
+                y_pred.append(new_prediction if new_prediction != -1 else original_prediction)
+                method_counts_by_label[true_label][method] += 1
+                if new_prediction == true_label:
+                    new_correct += 1
+            
+            # Update the result with the extraction method
+            result['extraction_method'] = method
+            
+            # Update prediction if extraction succeeded
+            if new_prediction != -1:
+                successful_extractions += 1
+                result['predicted_label'] = new_prediction
+        
+        else:
+            # Standard extraction returns just the prediction
+            new_prediction = extract_fn(result['output'], use_cot)
+            
+            if new_prediction != -1:
+                successful_extractions += 1
+                result['predicted_label'] = new_prediction
+                if has_true_label:
+                    y_pred.append(new_prediction)
+                    if new_prediction == true_label:
+                        new_correct += 1
+            else:
+                # Keep original prediction on extraction failure
+                if has_true_label:
+                    y_pred.append(original_prediction)
     
-    # Calculate accuracy based on mode
+    # Calculate metrics for successful extractions
+    metrics = {}
     total_samples = len(results)
     
+    if len(y_true) > 0 and len(y_pred) > 0:
+        # Filter out failed extractions
+        valid_indices = [i for i, pred in enumerate(y_pred) if pred != -1]
+        valid_y_true = [y_true[i] for i in valid_indices]
+        valid_y_pred = [y_pred[i] for i in valid_indices]
+        
+        if len(valid_y_true) > 0:
+            # Calculate 4 core metrics
+            accuracy = new_correct / len(valid_y_true) if len(valid_y_true) > 0 else 0
+            precision, recall, f1, _ = precision_recall_fscore_support(
+                valid_y_true, valid_y_pred, average='macro'
+            )
+            
+            # Add the 4 core metrics
+            metrics = {
+                'accuracy': float(accuracy),
+                'precision': float(precision),
+                'recall': float(recall),
+                'f1_score': float(f1)
+            }
+    
+    # Add metrics to top level (BEFORE results)
+    if metrics:
+        data.update(metrics)
+    
+    # Add results 
+    data['results'] = results
+    
+    # Prepare extraction stats (to be added AFTER results)
+    extraction_stats = {}
     if strict:
-        # In strict mode, we only count examples with successful extraction
-        successful_extractions = total_samples - extraction_failures
-        new_accuracy = correct_after / total_samples if total_samples > 0 else 0
-        strict_accuracy = correct_after / successful_extractions if successful_extractions > 0 else 0
-        data['strict_accuracy'] = strict_accuracy
-    else:
-        # Regular accuracy calculation
-    new_accuracy = correct_after / total_samples if total_samples > 0 else 0
-    
-    # Update accuracy in the main data
-    data['accuracy'] = new_accuracy
-    
-    # Add extraction method statistics for tracking mode
-    if tracking or strict:
-        data['extraction_stats'] = {
-            'methods': dict(extraction_methods),
-            'label_0_methods': dict(label_0_methods),
-            'label_1_methods': dict(label_1_methods),
-            'changes_1_to_0': changes_1_to_0,
-            'changes_0_to_1': changes_0_to_1,
-            'extraction_failures': extraction_failures,
-            'failure_rate': extraction_failures / total_samples if total_samples > 0 else 0
+        # For strict mode, report strict accuracy on successful extractions
+        strict_accuracy = new_correct / successful_extractions if successful_extractions > 0 else 0
+        
+        extraction_stats = {
+            'total_samples': total_samples,
+            'successful_extractions': successful_extractions,
+            'extraction_failures': strict_failures,
+            'extraction_failure_rate': strict_failures / total_samples if total_samples > 0 else 0,
+            'prediction_changes': prediction_changes,
+            'prediction_change_rate': prediction_changes / total_samples if total_samples > 0 else 0,
+            'changed_0_to_1': label_0_to_1,
+            'changed_1_to_0': label_1_to_0,
+            'original_accuracy': original_correct / total_samples if total_samples > 0 else 0,
+            'new_accuracy': new_correct / total_samples if total_samples > 0 else 0,
+            'strict_accuracy': strict_accuracy,
+            'extraction_methods': {method: count for method, count in method_counts.items()},
+            'methods_by_label': {label: dict(counts) for label, counts in method_counts_by_label.items()}
         }
+    else:
+        # For standard or tracking mode
+        extraction_stats = {
+            'total_samples': total_samples,
+            'successful_extractions': successful_extractions,
+            'extraction_success_rate': successful_extractions / total_samples if total_samples > 0 else 0,
+            'original_accuracy': original_correct / total_samples if total_samples > 0 else 0,
+            'new_accuracy': new_correct / total_samples if total_samples > 0 else 0
+        }
+        
+        if tracking:
+            extraction_stats['extraction_methods'] = {method: count for method, count in method_counts.items()}
+            extraction_stats['methods_by_label'] = {label: dict(counts) for label, counts in method_counts_by_label.items()}
     
-    # Save updated results if output file specified
-    if output_file:
-        try:
-            with open(output_file, 'w') as f:
-                json.dump(data, f, indent=2)
-            print(f"Updated results saved to: {output_file}")
-        except Exception as e:
-            print(f"Error saving output file: {e}", file=sys.stderr)
+    # Add extraction stats AFTER results
+    data['extraction_stats'] = extraction_stats
     
-    # Report statistics
+    # Determine output file path
+    if output_file is None:
+        # Create default output file name
+        base_path = os.path.splitext(input_file)[0]
+        suffix = "_strict" if strict else "_tracked" if tracking else "_parsed"
+        output_file = f"{base_path}{suffix}.json"
+    
+    # Save updated results
+    try:
+        with open(output_file, 'w') as f:
+            json.dump(data, f, indent=2)
+        print(f"Updated results saved to: {output_file}")
+    except Exception as e:
+        print(f"Error: Failed to save output file {output_file}: {e}")
+        return False
+    
+    # Print summary
     print("\n=== Re-analysis Complete ===")
     print(f"Total samples: {total_samples}")
-    print(f"Extraction failures: {extraction_failures} ({extraction_failures/total_samples*100:.2f}%)")
-    print(f"Prediction changes: {prediction_changes} ({prediction_changes/total_samples*100:.2f}%)")
-    
-    if tracking or strict:
-        print(f"Changes 1->0: {changes_1_to_0} ({changes_1_to_0/prediction_changes*100:.2f}% of changes)" if prediction_changes > 0 else "Changes 1->0: 0 (0%)")
-        print(f"Changes 0->1: {changes_0_to_1} ({changes_0_to_1/prediction_changes*100:.2f}% of changes)" if prediction_changes > 0 else "Changes 0->1: 0 (0%)")
-    
-    print(f"\nAccuracy before: {correct_before/total_samples:.4f} ({correct_before}/{total_samples})")
-    print(f"Accuracy after:  {correct_after/total_samples:.4f} ({correct_after}/{total_samples})")
-    
+    print(f"Successful extractions: {successful_extractions}")
     if strict:
-        print(f"Strict accuracy: {strict_accuracy:.4f} (counting only successful extractions)")
+        print(f"Extraction failures: {strict_failures} ({strict_failures/total_samples*100:.2f}%)")
+        print()
+        print(f"Prediction changes: {prediction_changes} ({prediction_changes/total_samples*100:.2f}%)")
+        print(f"Changes 0->1: {label_0_to_1} ({label_0_to_1/prediction_changes*100:.2f}% of changes)")
+        print(f"Changes 1->0: {label_1_to_0} ({label_1_to_0/prediction_changes*100:.2f}% of changes)")
+        print()
+        print(f"Accuracy before: {original_correct/total_samples:.4f} ({original_correct}/{total_samples})")
+        print(f"Accuracy after:  {new_correct/total_samples:.4f} ({new_correct}/{total_samples})")
+        print(f"Strict accuracy (on successful extractions): {strict_accuracy:.4f} ({new_correct}/{successful_extractions})")
+    else:
+        print(f"Extraction failures: {total_samples - successful_extractions} ({(total_samples - successful_extractions)/total_samples*100:.2f}%)")
+        if len(y_true) > 0:
+            accuracy = new_correct/len(y_true)
+            print(f"Accuracy: {accuracy:.4f} ({new_correct}/{len(y_true)})")
+            if 'precision' in metrics:
+                print(f"Precision: {metrics['precision']:.4f}, Recall: {metrics['recall']:.4f}, F1: {metrics['f1_score']:.4f}")
     
+    # Print classification report for successful extractions if we have labels
+    if len(y_true) > 0 and len(y_pred) > 0:
+        valid_indices = [i for i, pred in enumerate(y_pred) if pred != -1]
+        valid_y_true = [y_true[i] for i in valid_indices]
+        valid_y_pred = [y_pred[i] for i in valid_indices]
+        
+        if len(valid_y_true) > 0:
+            print(f"\n=== Classification Metrics (on successful extractions) ===")
+            print(classification_report(valid_y_true, valid_y_pred, labels=[0, 1], 
+                                       target_names=["no entailment (0)", "entailment (1)"]))
+    
+    # Print extraction methods if tracking
     if tracking or strict:
         print("\n=== Extraction Methods Used ===")
-        for method, count in extraction_methods.most_common():
-            percent = count/total_samples*100
-            print(f"{method:<25}: {count:5} ({percent:.2f}%)")
+        total = sum(method_counts.values())
+        for method, count in sorted(method_counts.items(), key=lambda x: x[1], reverse=True):
+            print(f"{method:20s}: {count:5d} ({count/total*100:.2f}%)")
         
-        print("\n=== Methods for Label 0 ===")
-        total_0s = sum(label_0_methods.values())
-        for method, count in label_0_methods.most_common():
-            percent = count/total_0s*100 if total_0s > 0 else 0
-            print(f"{method:<25}: {count:5} ({percent:.2f}%)")
+        # Print methods by predicted label
+        if 0 in method_counts_by_label:
+            print("\n=== Methods for Label 0 ===")
+            for method, count in sorted(method_counts_by_label[0].items(), key=lambda x: x[1], reverse=True):
+                print(f"{method:20s}: {count:5d}")
         
-        print("\n=== Methods for Label 1 ===")
-        total_1s = sum(label_1_methods.values())
-        for method, count in label_1_methods.most_common():
-            percent = count/total_1s*100 if total_1s > 0 else 0
-            print(f"{method:<25}: {count:5} ({percent:.2f}%)")
+        if 1 in method_counts_by_label:
+            print("\n=== Methods for Label 1 ===")
+            for method, count in sorted(method_counts_by_label[1].items(), key=lambda x: x[1], reverse=True):
+                print(f"{method:20s}: {count:5d}")
     
-    return {
-        'total': total_samples,
-        'original_correct': correct_before,
-        'improved_correct': correct_after,
-        'accuracy_before': correct_before/total_samples if total_samples > 0 else 0,
-        'accuracy_after': correct_after/total_samples if total_samples > 0 else 0,
-        'changes': prediction_changes,
-        'extraction_failures': extraction_failures
-    }
+    return True
 
 def summarize_extraction_stats(input_file):
     """Print a summary of extraction statistics from an already processed file."""
@@ -539,30 +615,32 @@ def compare_models(file_paths):
             accuracy = data.get('accuracy', 0)
             strict_accuracy = data.get('strict_accuracy', None)
             stats = data.get('extraction_stats', {})
-            
+            class_metrics = data.get('classification_metrics', {})
+            f1_macro = class_metrics.get('macro avg', {}).get('f1-score', None)
+            f1_weighted = class_metrics.get('weighted avg', {}).get('f1-score', None)
+            precision_1 = class_metrics.get('entailment (1)', {}).get('precision', None)
+            recall_1 = class_metrics.get('entailment (1)', {}).get('recall', None)
+            f1_1 = class_metrics.get('entailment (1)', {}).get('f1-score', None)
+
+            model_data = {
+                'accuracy': accuracy,
+                'extraction_methods': stats.get('methods', {}),
+                'label_0_methods': stats.get('label_0_methods', {}),
+                'label_1_methods': stats.get('label_1_methods', {}),
+                'changes_1_to_0': stats.get('changes_1_to_0', 0),
+                'changes_0_to_1': stats.get('changes_0_to_1', 0),
+                'f1_macro': f1_macro,
+                'f1_weighted': f1_weighted,
+                'precision_1': precision_1,
+                'recall_1': recall_1,
+                'f1_1': f1_1
+            }
             if strict_accuracy is not None:
-                # This is a strict evaluation file
-                all_stats[model_name] = {
-                    'accuracy': accuracy,
-                    'strict_accuracy': strict_accuracy,
-                    'extraction_methods': stats.get('methods', {}),
-                    'label_0_methods': stats.get('label_0_methods', {}),
-                    'label_1_methods': stats.get('label_1_methods', {}),
-                    'changes_1_to_0': stats.get('changes_1_to_0', 0),
-                    'changes_0_to_1': stats.get('changes_0_to_1', 0),
-                    'extraction_failures': stats.get('extraction_failures', 0),
-                    'failure_rate': stats.get('failure_rate', 0)
-                }
-            else:
-                # Standard evaluation file
-                all_stats[model_name] = {
-                    'accuracy': accuracy,
-                    'extraction_methods': stats.get('methods', {}),
-                    'label_0_methods': stats.get('label_0_methods', {}),
-                    'label_1_methods': stats.get('label_1_methods', {}),
-                    'changes_1_to_0': stats.get('changes_1_to_0', 0),
-                    'changes_0_to_1': stats.get('changes_0_to_1', 0)
-                }
+                model_data['strict_accuracy'] = strict_accuracy
+                model_data['extraction_failures'] = stats.get('extraction_failures', 0)
+                model_data['failure_rate'] = stats.get('failure_rate', 0)
+
+            all_stats[model_name] = model_data
                 
         except Exception as e:
             print(f"Error loading {file_path}: {e}")
@@ -576,34 +654,49 @@ def compare_models(file_paths):
     
     print("\n=== Model Comparison ===")
     
-    # Accuracy comparison
-    print("\nAccuracy Comparison:")
+    # Accuracy and F1 comparison
+    print("\nAccuracy & F1 Comparison:")
     
-    if any('strict_accuracy' in all_stats[m] for m in model_names):
-        headers = ["Model", "Standard", "Strict", "Failure Rate"]
-        print(f"{headers[0]:<30} {headers[1]:<10} {headers[2]:<10} {headers[3]:<15}")
-        print("-" * 70)
-        
-        for model in model_names:
-            stats = all_stats[model]
-            standard = stats.get('accuracy', 0) * 100
-            strict = stats.get('strict_accuracy', 0) * 100 if 'strict_accuracy' in stats else 'N/A'
-            failure = stats.get('failure_rate', 0) * 100 if 'failure_rate' in stats else 'N/A'
-            
-            strict_str = f"{strict:.1f}%" if isinstance(strict, float) else strict
-            failure_str = f"{failure:.1f}%" if isinstance(failure, float) else failure
-            
-            print(f"{model:<30} {standard:.1f}%{' ':5} {strict_str:<10} {failure_str:<15}")
-    else:
-        headers = ["Model", "Accuracy"]
-        print(f"{headers[0]:<30} {headers[1]:<10}")
-        print("-" * 45)
-        
-        for model in model_names:
-            stats = all_stats[model]
-            accuracy = stats.get('accuracy', 0) * 100
-            print(f"{model:<30} {accuracy:.1f}%")
+    has_strict = any('strict_accuracy' in all_stats[m] for m in model_names)
+    has_f1 = any(all_stats[m].get('f1_macro') is not None for m in model_names)
+
+    headers = ["Model", "Accuracy"]
+    if has_strict: headers.append("StrictAcc")
+    if has_f1: headers.extend(["F1-Macro", "F1-Wgt", "F1 (1)"])
+    if has_strict: headers.append("FailRate")
     
+    col_widths = [30, 10]
+    if has_strict: col_widths.append(10)
+    if has_f1: col_widths.extend([10, 10, 10])
+    if has_strict: col_widths.append(10)
+
+    header_fmt = "".join([f"{{{i}:<{w}}}" for i, w in enumerate(col_widths)])
+    print(header_fmt.format(*headers))
+    print("-" * sum(col_widths))
+
+    for model in model_names:
+        stats = all_stats[model]
+        cols = [model]
+        cols.append(f"{stats.get('accuracy', 0)*100:.1f}%")
+        
+        if has_strict:
+            strict_acc = stats.get('strict_accuracy')
+            cols.append(f"{strict_acc*100:.1f}%" if strict_acc is not None else "N/A")
+            
+        if has_f1:
+            f1_macro = stats.get('f1_macro')
+            f1_wgt = stats.get('f1_weighted')
+            f1_1 = stats.get('f1_1')
+            cols.append(f"{f1_macro:.3f}" if f1_macro is not None else "N/A")
+            cols.append(f"{f1_wgt:.3f}" if f1_wgt is not None else "N/A")
+            cols.append(f"{f1_1:.3f}" if f1_1 is not None else "N/A")
+
+        if has_strict:
+            fail_rate = stats.get('failure_rate')
+            cols.append(f"{fail_rate*100:.1f}%" if fail_rate is not None else "N/A")
+            
+        print(header_fmt.format(*cols))
+
     # Print prediction changes
     if all('changes_1_to_0' in all_stats[m] for m in model_names):
         print("\nPrediction Changes:")

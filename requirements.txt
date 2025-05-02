@@ -9,10 +9,14 @@ bitsandbytes
 sentencepiece
 flash-attn
 protobuf
+huggingface_hub  # For downloading models from HF Hub
 
 # Data Handling & Metrics
-# pandas>=2.0.0 # Removed - Not essential for simple_run_sft.py
-# scikit-learn>=1.3.0 # Removed - Not essential for simple_run_sft.py
+pandas>=2.0.0
+scikit-learn>=1.3.0
+requests  # For data download
+tqdm  # For progress bars
+python-dotenv  # For loading environment variables
 
 # Optional Logging
 wandb  # Enabled for training monitoring 

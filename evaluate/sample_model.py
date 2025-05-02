@@ -8,6 +8,7 @@ Features include Chain-of-Thought reasoning, checkpointing, and resuming from in
 """
 
 import os
+import sys
 import json
 import time
 import argparse
@@ -16,6 +17,13 @@ import torch
 import numpy as np
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from tqdm import tqdm
+from sklearn.metrics import precision_recall_fscore_support, accuracy_score, confusion_matrix
+
+# Add project root to sys.path to allow importing prompts
+script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(script_dir)
+sys.path.append(project_root)
+
 from prompts import FINETUNE_PROMPT
 # For loading LoRA adapters
 try:
@@ -81,6 +89,12 @@ def parse_args():
         type=int, 
         default=0, 
         help="GPU ID to use for inference (if multiple GPUs available)"
+    )
+    parser.add_argument(
+        "--output_csv", 
+        type=str, 
+        default=None, 
+        help="Optional path to save predictions as a single-column CSV"
     )
     return parser.parse_args()
 
@@ -220,16 +234,22 @@ def prepare_model_and_tokenizer(model_id, gpu_id=0):
                 trust_remote_code=True
             )
             
+            # Load tokenizer from the adapter path (it might have different vocab size)
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_id, # Use the checkpoint path for the tokenizer
+                use_fast=True,
+                padding_side="left"
+            )
+
+            # Resize token embeddings if tokenizer vocab size differs from base model
+            if len(tokenizer) != base_model.config.vocab_size:
+                print(f"Resizing token embeddings from {base_model.config.vocab_size} to {len(tokenizer)}")
+                base_model.resize_token_embeddings(len(tokenizer))
+
             # Load LoRA adapter
             model = PeftModel.from_pretrained(base_model, model_id)
             print("Successfully loaded the model with LoRA adapter")
             
-            # Load tokenizer from the same path
-            tokenizer = AutoTokenizer.from_pretrained(
-                model_id,
-                use_fast=True,
-                padding_side="left"
-            )
         except Exception as e:
             print(f"Error loading with PEFT: {e}")
             print("Falling back to standard loading...")
@@ -274,66 +294,60 @@ def get_checkpoint_path(args):
     checkpoint_filename = f"checkpoint_{output_filename}"
     return os.path.join(output_dir, checkpoint_filename)
 
+def convert_to_json_serializable(obj):
+    """Convert numpy types to Python native types for JSON serialization."""
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    elif isinstance(obj, dict):
+        return {k: convert_to_json_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_to_json_serializable(item) for item in obj]
+    else:
+        return obj
+
 def save_checkpoint(args, results, current_idx, start_time):
-    """Save the current progress to a checkpoint file."""
+    """Save a checkpoint to resume from later."""
     checkpoint_path = get_checkpoint_path(args)
     
-    # Calculate current statistics
-    current_time = time.time()
-    elapsed_time = current_time - start_time
-    
-    # Count correct predictions
-    correct_predictions = sum(1 for r in results if r.get('correct', False))
+    # Calculate accuracy so far
     processed_samples = len(results)
+    correct_predictions = sum(1 for r in results if r.get('correct', False))
+    accuracy_so_far = correct_predictions / processed_samples if processed_samples > 0 else 0
     
-    # Create a JSON-compatible version of results
-    # Convert all NumPy types to Python native types
-    json_compatible_results = []
-    for result in results:
-        cleaned_result = {}
-        for k, v in result.items():
-            # Convert numpy types to native Python types
-            if isinstance(v, np.integer):
-                cleaned_result[k] = int(v)
-            elif isinstance(v, np.floating):
-                cleaned_result[k] = float(v)
-            elif isinstance(v, np.ndarray):
-                cleaned_result[k] = v.tolist()
-            elif isinstance(v, np.bool_):
-                cleaned_result[k] = bool(v)
-            else:
-                cleaned_result[k] = v
-        json_compatible_results.append(cleaned_result)
+    # Calculate elapsed time and estimated remaining time
+    elapsed_time = time.time() - start_time
+    estimated_remaining_time = elapsed_time / current_idx * (args.total_samples - current_idx) if current_idx > 0 else 0
     
+    # Create checkpoint data
     checkpoint = {
-        'model': args.model_id,
         'current_idx': current_idx,
-        'elapsed_time': elapsed_time,
         'processed_samples': processed_samples,
-        'correct_predictions': correct_predictions,
-        'accuracy_so_far': correct_predictions / processed_samples if processed_samples > 0 else 0,
-        'use_cot': args.use_cot,
-        'results': json_compatible_results
+        'accuracy_so_far': accuracy_so_far,
+        'elapsed_time': elapsed_time,
+        'estimated_remaining_time': estimated_remaining_time,
+        'results': results
     }
     
-    temp_path = f"{checkpoint_path}.temp"
-    with open(temp_path, 'w') as f:
-        json.dump(checkpoint, f, indent=2)
+    # Convert to JSON serializable format
+    json_serializable_checkpoint = convert_to_json_serializable(checkpoint)
     
-    # Rename to final path to ensure atomic operation
-    os.replace(temp_path, checkpoint_path)
+    # Save checkpoint
+    with open(checkpoint_path, 'w') as f:
+        json.dump(json_serializable_checkpoint, f)
     
-    # Calculate and print progress statistics
-    samples_per_second = processed_samples / elapsed_time if elapsed_time > 0 else 0
-    remaining_samples = args.total_samples - current_idx
-    estimated_remaining_time = remaining_samples / samples_per_second if samples_per_second > 0 else 0
-    
-    print(f"\n--- Checkpoint saved ---")
+    print("\n--- Checkpoint saved ---")
     print(f"Processed {processed_samples}/{args.total_samples} samples "
           f"({processed_samples/args.total_samples*100:.1f}%)")
-    print(f"Current accuracy: {correct_predictions/processed_samples:.4f} "
-          f"({correct_predictions}/{processed_samples})")
-    print(f"Speed: {samples_per_second:.2f} samples/second")
+    # Only print accuracy if we have any processed samples
+    if processed_samples > 0:
+        print(f"Current accuracy: {accuracy_so_far:.4f} "
+              f"({correct_predictions}/{processed_samples})")
     print(f"Elapsed time: {elapsed_time/60:.1f} minutes")
     print(f"Estimated time remaining: {estimated_remaining_time/60:.1f} minutes")
     print(f"Checkpoint saved to: {checkpoint_path}")
@@ -360,23 +374,6 @@ def load_checkpoint(args):
         print(f"Error loading checkpoint: {e}")
         return 0, 0, []
 
-def convert_to_json_serializable(obj):
-    """Convert numpy types to Python native types for JSON serialization."""
-    if isinstance(obj, np.integer):
-        return int(obj)
-    elif isinstance(obj, np.floating):
-        return float(obj)
-    elif isinstance(obj, np.ndarray):
-        return obj.tolist()
-    elif isinstance(obj, np.bool_):
-        return bool(obj)
-    elif isinstance(obj, dict):
-        return {k: convert_to_json_serializable(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [convert_to_json_serializable(item) for item in obj]
-    else:
-        return obj
-
 def run_inference(model, tokenizer, test_data, args):
     """Run inference on the test data and return predictions."""
     # Set total_samples for checkpoint progress reporting
@@ -387,7 +384,10 @@ def run_inference(model, tokenizer, test_data, args):
     
     # Start timing
     start_time = time.time() - elapsed_time
-    correct_predictions = sum(1 for r in results if r.get('correct', False))
+    
+    # Check if we have labels in the test data
+    has_labels = 'label' in test_data.columns
+    correct_predictions = sum(1 for r in results if r.get('correct', False)) if has_labels else 0
     
     total_samples = len(test_data)
     batch_count = 0
@@ -431,22 +431,27 @@ def run_inference(model, tokenizer, test_data, args):
             # Extract the prediction
             try:
                 prediction = extract_prediction(text, args.use_cot)
-                true_label = batch_data.iloc[j]['label']
                 
-                # Check if the prediction is correct
-                is_correct = prediction == true_label
-                if is_correct:
-                    correct_predictions += 1
-                
-                # Save the result
-                results.append({
+                # Create result object
+                result = {
                     'premise': batch_data.iloc[j]['premise'],
                     'hypothesis': batch_data.iloc[j]['hypothesis'],
-                    'true_label': int(true_label),
                     'predicted_label': prediction,
-                    'correct': is_correct,
                     'output': text
-                })
+                }
+                
+                # If we have labels, add accuracy information
+                if has_labels:
+                    true_label = batch_data.iloc[j]['label']
+                    is_correct = prediction == true_label
+                    if is_correct:
+                        correct_predictions += 1
+                    
+                    result['true_label'] = int(true_label)
+                    result['correct'] = is_correct
+                
+                # Save the result
+                results.append(result)
             except Exception as e:
                 print(f"Error processing sample {idx}: {e}")
         
@@ -459,9 +464,41 @@ def run_inference(model, tokenizer, test_data, args):
         if batch_count % args.save_every == 0:
             save_checkpoint(args, results, i + args.batch_size, start_time)
     
-    # Calculate final accuracy
-    accuracy = correct_predictions / total_samples if total_samples > 0 else 0
-    print(f"Accuracy: {accuracy:.4f} ({correct_predictions}/{total_samples})")
+    # Calculate final metrics if we have labels
+    metrics = {}
+    if has_labels and total_samples > 0:
+        # Basic accuracy
+        accuracy = correct_predictions / total_samples
+        
+        # Extract true and predicted labels for more detailed metrics
+        y_true = [r['true_label'] for r in results]
+        y_pred = [r['predicted_label'] for r in results]
+        
+        # Calculate detailed metrics using scikit-learn
+        try:
+            # Calculate just the 4 core metrics (macro avg)
+            precision, recall, f1, _ = precision_recall_fscore_support(
+                y_true, y_pred, average='macro'
+            )
+            
+            # Store just the 4 core metrics
+            metrics = {
+                'accuracy': float(accuracy),
+                'precision': float(precision),
+                'recall': float(recall),
+                'f1_score': float(f1)
+            }
+            
+            print(f"Accuracy: {accuracy:.4f} ({correct_predictions}/{total_samples})")
+            print(f"Precision: {precision:.4f}, Recall: {recall:.4f}, F1: {f1:.4f}")
+        except ImportError:
+            print("scikit-learn not available. Only computing basic accuracy.")
+            metrics = {'accuracy': float(accuracy)}
+        except Exception as e:
+            print(f"Error computing detailed metrics: {e}")
+            metrics = {'accuracy': float(accuracy)}
+    else:
+        print("No 'label' column found in data. Skipping metrics calculation.")
     
     # Final elapsed time
     elapsed_time = time.time() - start_time
@@ -469,15 +506,28 @@ def run_inference(model, tokenizer, test_data, args):
     # Convert results to JSON serializable format
     json_serializable_results = convert_to_json_serializable(results)
     
-    # Save final results
+    # Build the output structure - metadata first
     output = {
         'model': args.model_id,
-        'accuracy': accuracy,
         'inference_time_seconds': elapsed_time,
         'samples_per_second': total_samples / elapsed_time if elapsed_time > 0 else 0,
-        'use_cot': args.use_cot,
-        'results': json_serializable_results
+        'use_cot': args.use_cot
     }
+    
+    # Add the 4 core metrics if available
+    if metrics:
+        output.update(metrics)
+    
+    # Add results AFTER metrics - this is the large array!
+    output['results'] = json_serializable_results
+    
+    # Add inference statistics AFTER results
+    if has_labels:
+        output['extraction_stats'] = {
+            'total_samples': total_samples,
+            'correct_predictions': correct_predictions,
+            'accuracy': float(accuracy) if 'accuracy' not in metrics else metrics['accuracy']
+        }
     
     with open(args.output_file, 'w') as f:
         json.dump(output, f, indent=2)
@@ -487,14 +537,22 @@ def run_inference(model, tokenizer, test_data, args):
     if os.path.exists(checkpoint_path):
         os.remove(checkpoint_path)
     
-    return results, accuracy, elapsed_time
+    return results, metrics, elapsed_time
 
 def main():
     args = parse_args()
     
-    # Create output directory if it doesn't exist
-    os.makedirs(os.path.dirname(args.output_file), exist_ok=True)
-    
+    # Ensure output directory exists
+    output_dir = os.path.dirname(args.output_file)
+    if output_dir: # Create directory only if output_file path includes a directory
+        os.makedirs(output_dir, exist_ok=True)
+        
+    # Also ensure output CSV directory exists if specified
+    if args.output_csv:
+        csv_output_dir = os.path.dirname(args.output_csv)
+        if csv_output_dir:
+            os.makedirs(csv_output_dir, exist_ok=True)
+
     # Load test data
     print(f"Loading test data from: {args.test_file}")
     test_data = pd.read_csv(args.test_file)
@@ -508,12 +566,31 @@ def main():
     
     # Run inference
     start_time = time.time()
-    results, accuracy, elapsed_time = run_inference(model, tokenizer, test_data, args)
+    results, metrics, elapsed_time = run_inference(model, tokenizer, test_data, args)
     
     print(f"Results saved to: {args.output_file}")
     print(f"Inference completed in {elapsed_time/60:.1f} minutes")
     print(f"Throughput: {len(test_data) / elapsed_time:.2f} samples/second")
-    print(f"Accuracy: {accuracy:.4f}")
+
+    # Display metrics summary
+    if metrics and 'accuracy' in metrics:
+        print(f"Accuracy: {metrics['accuracy']:.4f}")
+        if 'macro_avg' in metrics:
+            print(f"Macro Avg - Precision: {metrics['macro_avg']['precision']:.4f}, "
+                  f"Recall: {metrics['macro_avg']['recall']:.4f}, "
+                  f"F1: {metrics['macro_avg']['f1_score']:.4f}")
+    else:
+        print("No metrics calculated (no 'label' column in test data)")
+
+    # Save predictions to CSV if requested
+    if args.output_csv:
+        try:
+            predictions = [item['predicted_label'] for item in results]
+            predictions_df = pd.DataFrame({'predicted_label': predictions})
+            predictions_df.to_csv(args.output_csv, index=False, header=True)
+            print(f"Predictions saved to CSV: {args.output_csv}")
+        except Exception as e:
+            print(f"Error saving predictions to CSV: {e}")
 
 if __name__ == "__main__":
     main() 
