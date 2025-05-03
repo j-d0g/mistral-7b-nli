@@ -7,7 +7,7 @@ Based on the parameters from training_runs.md
 from train.configs.default import *
 
 # Model and data paths
-output_dir = "models/mistral-7b-nli-cot-ablation1"
+output_dir = "models/mistral-thinking-abl2"
 
 # Training parameters
 batch_size = 16

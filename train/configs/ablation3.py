@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(current_dir))
 from configs.default import *
 
 # Model and data paths
-output_dir = "models/mistral-7b-nli-cot-ablation3"
+output_dir = "models/mistral-thinking-abl3"
 
 # Training parameters
 batch_size = 16

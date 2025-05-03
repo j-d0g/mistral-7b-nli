@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(current_dir))
 from configs.default import *
 
 # Model and data paths
-output_dir = "models/mistral-7b-nli-cot-ablation1"
+output_dir = "models/mistral-thinking-abl1"
 
 # Training parameters
 batch_size = 16
@@ -29,7 +29,7 @@ lora_dropout = 0.05
 # Wandb
 use_wandb = True
 wandb_run_id = None
-wandb_project = "mistral7b_cot"
+wandb_project = "mistral_thinking_nli"
 wandb_name = "ablation1"
 
 # Other settings
