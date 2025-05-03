@@ -1,7 +1,16 @@
 import os
 import sys
+import time
 from pathlib import Path
 from huggingface_hub import hf_hub_download, HfApi, list_repo_files
+from dotenv import load_dotenv
+
+# Automatically load environment variables from .env file
+if os.path.exists('.env'):
+    load_dotenv()
+    print("✓ Loaded environment variables from .env file")
+else:
+    print("⚠ No .env file found in project root")
 
 # Get HF token from environment variables
 HF_TOKEN = os.getenv("HF_TOKEN")
@@ -11,10 +20,9 @@ ERROR: HF_TOKEN not found in environment variables.
 Please ensure:
 1. You have created a token at https://huggingface.co/settings/tokens
 2. Added it to your .env file with format: HF_TOKEN=your_token_here
-3. Your Docker command includes --env-file .env
 
 Example usage:
-  docker run --rm -v $(pwd):/app -w /app --env-file .env mistral-nli-ft python3 models/download_model.py
+  docker run --rm -v $(pwd):/app -w /app mistral-nli-ft python3 models/download_model.py
 """)
     sys.exit(1)
 
