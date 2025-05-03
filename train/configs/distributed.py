@@ -34,7 +34,7 @@ save_steps = 250
 save_total_limit = 2
 
 # Wandb
-wandb_project = "mistral7b_cot_distributed"
+wandb_project = "mistral-thinking-nli"
 wandb_run_name = None  # Will be generated if not specified
 wandb_run_id = None
 

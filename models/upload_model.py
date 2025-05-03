@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from huggingface_hub import HfApi, upload_folder
 from dotenv import load_dotenv
-from hf_config import HF_TOKEN, HF_USERNAME, HF_REPO_NAME, HF_REPO_ID, MODEL_PATHS
+
 # Automatically load environment variables from .env file
 if os.path.exists('.env'):
     load_dotenv()
@@ -39,13 +39,14 @@ LOCAL_MODEL_DIR = Path("models")
 
 # List of checkpoint model paths to upload
 MODEL_PATHS = [
-    "mistral-thinking-abl0",
-    "mistral-thinking-abl0_ext",
-    "mistral-thinking-abl0_dist",
-    "mistral-thinking-abl1",
-    "mistral-thinking-abl2",
-    "mistral-thinking-abl3",
-    "mistral-7b-nli-cot"
+    # "mistral-thinking-abl0",
+    "mistral-thinking-abl0-ext",
+    "mistral-thinking-abl0-merged"
+    # "mistral-thinking-abl0_dist",
+    # "mistral-thinking-abl1",
+    # "mistral-thinking-abl2",
+    # "mistral-thinking-abl3",
+    # "mistral-7b-nli-cot"
 ]
 
 print(f"Preparing to upload models to {REPO_ID}...")

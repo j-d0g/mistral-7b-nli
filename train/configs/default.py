@@ -15,7 +15,7 @@ lora_alpha = 32
 lora_dropout = 0.05
 
 # Training parameters
-num_epochs = 5
+num_epochs = 2
 max_seq_length = 512
 batch_size = 16
 grad_accumulation_steps = 2

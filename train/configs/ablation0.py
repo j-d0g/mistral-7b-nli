@@ -12,12 +12,12 @@ sys.path.insert(0, os.path.dirname(current_dir))
 from configs.default import *
 
 # Model and data paths
-output_dir = "models/mistral-7b-nli-cot-ablation0"
+output_dir = "models/mistral-thinking-abl0-ext"
 
 # Training parameters
-batch_size = 16
-grad_accumulation_steps = 1  # Effective batch size: 16
-learning_rate = 1e-4
+batch_size = 8
+grad_accumulation_steps = 2  # Effective batch size: 16
+learning_rate = 2e-4
 warmup_ratio = 0.03
 
 # LoRA parameters
