@@ -1,3 +1,7 @@
+"""
+Uploads models of specified path in models/ directory to HuggingFace repository.
+"""
+
 import os
 import sys
 import glob
@@ -5,7 +9,7 @@ import time
 from pathlib import Path
 from huggingface_hub import HfApi, upload_folder
 from dotenv import load_dotenv
-
+from hf_config import HF_TOKEN, HF_USERNAME, HF_REPO_NAME, HF_REPO_ID, MODEL_PATHS
 # Automatically load environment variables from .env file
 if os.path.exists('.env'):
     load_dotenv()
@@ -29,16 +33,19 @@ Example usage:
 
 # User info (default values)
 USERNAME = os.getenv("HF_USERNAME", "jd0g")
-REPO_NAME = os.getenv("HF_REPO_NAME", "Mistral-v0.3-Thinking_NLI")
+REPO_NAME = os.getenv("HF_REPO_NAME", "Mistral-Thinking-NLI")
 REPO_ID = f"{USERNAME}/{REPO_NAME}"
 LOCAL_MODEL_DIR = Path("models")
 
 # List of checkpoint model paths to upload
 MODEL_PATHS = [
-    "Mistral_Thinking_Abl0",
-    "Mistral_Thinking_Abl0/checkpoint-2225",
-    "Mistral_Thinking_Abl1/checkpoint-1250",
-    "Mistral_Thinking_Abl2/checkpoint-2000"
+    "mistral-thinking-abl0",
+    "mistral-thinking-abl0_ext",
+    "mistral-thinking-abl0_dist",
+    "mistral-thinking-abl1",
+    "mistral-thinking-abl2",
+    "mistral-thinking-abl3",
+    "mistral-7b-nli-cot"
 ]
 
 print(f"Preparing to upload models to {REPO_ID}...")

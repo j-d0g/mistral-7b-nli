@@ -34,10 +34,13 @@ LOCAL_MODEL_DIR = Path("models")
 
 # List of checkpoint model paths to download
 MODEL_PATHS = [
-    "Mistral_Thinking_Abl0",
-    "Mistral_Thinking_Abl0/checkpoint-2225",
-    "Mistral_Thinking_Abl1/checkpoint-1250",
-    "Mistral_Thinking_Abl2/checkpoint-2000"
+    "mistral-thinking-abl0_ext", # Best model
+    # "mistral-thinking-abl0",
+    # "mistral-thinking-abl0_dist",
+    # "mistral-thinking-abl1",
+    # "mistral-thinking-abl2",
+    # "mistral-thinking-abl3",
+    # "mistral-7b-nli-cot"
 ]
 
 # Create the model directory if it doesn't exist
