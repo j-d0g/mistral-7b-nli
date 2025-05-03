@@ -1,6 +1,33 @@
-p# Mistral-7b Fine-Tuning for NLI with Chain-of-Thought
+# Mistral-7b Fine-Tuning for NLI with Chain-of-Thought
 
 This project focuses on fine-tuning the Mistral-7B language model for Natural Language Inference (NLI) tasks, specifically using Chain-of-Thought (CoT) reasoning to improve classification performance and interpretability.
+
+## Quick Start
+
+Here's the fastest path to get up and running with this project:
+
+```bash
+# 1. Clone the repository (if you haven't already)
+git clone https://github.com/yourusername/mistral-7b-nli.git
+cd mistral-7b-nli
+
+# 2. Create a .env file with your Hugging Face token
+echo "HF_TOKEN=your_token_here" > .env
+
+# 3. Build the Docker container
+docker build -t mistral-nli-ft .
+
+# 4. Download the datasets
+docker run --rm -v $(pwd):/app -w /app --env-file .env mistral-nli-ft python3 data/download_data.py
+
+# 5. Download the models
+docker run --rm -v $(pwd):/app -w /app --env-file .env mistral-nli-ft python3 models/download_model.py
+
+# 6. Run inference with the best model on the sample dataset
+./run_inference.sh --model models/Mistral_Thinking_Abl2/checkpoint-2000 --data data/sample/demo.csv
+```
+
+See the sections below for more detailed instructions.
 
 ## Project Goal
 
@@ -29,13 +56,6 @@ docker build -t mistral-nli-ft .
 
 # Download datasets through Docker
 docker run --rm -v $(pwd):/app -w /app mistral-nli-ft python3 data/download_data.py
-
-# Method 2: Set up a virtual environment (if not using Docker)
-python3 -m venv venv
-source venv/bin/activate
-pip install requests tqdm python-dotenv
-cd data
-python3 download_data.py
 ```
 
 The script will:
@@ -68,21 +88,21 @@ We've optimized the inference process to efficiently process the 1977-sample NLI
 
 ### Running Unified Inference
 
-Our consolidated inference script (`evaluate/run_inference.sh`) handles all inference scenarios through a simple parameter system. The script automatically detects whether your dataset has labels and adjusts the output accordingly.
+Our consolidated inference script (`run_inference.sh`) handles all inference scenarios through a simple parameter system. The script automatically detects whether your dataset has labels and adjusts the output accordingly.
 
 Example (basic usage from the repository root):
 ```bash
 # Run with default parameters (demo dataset and default model)
-./evaluate/run_inference.sh
+./run_inference.sh
 
 # Run with a specific model and dataset
-./evaluate/run_inference.sh --model models/mistral-thinking-abl0 --data data/original_data/test.csv
+./run_inference.sh --model models/Mistral_Thinking_Abl0 --data data/original_data/test.csv
 
 # Run with a specific checkpoint
-./evaluate/run_inference.sh --model models/mistral-thinking-abl0/checkpoint-2000
+./run_inference.sh --model models/Mistral_Thinking_Abl2/checkpoint-2000
 
 # Use a specific GPU
-./evaluate/run_inference.sh --gpu 1 
+./run_inference.sh --gpu 1 
 ```
 
 This unified approach:
@@ -203,68 +223,66 @@ The Hub repository's README provides details on the available checkpoints and ho
 
 We provide convenient scripts to download the fine-tuned Mistral-7B NLI model from the Hugging Face repository:
 
-1. **Using the download_model.py script (recommended)**:
-   This script will download only the essential adapter files needed for inference from the Mistral_Thinking_Abl2 checkpoint.
+```bash
+# First, create a .env file with your Hugging Face token
+echo "HF_TOKEN=your_token_here" > .env
 
-   ```bash
-   # Navigate to the project root
-   cd /path/to/mistral-7b-nli
-   
-   # Create the models directory if it doesn't exist
-   mkdir -p models
-   
-   # Run the download script
-   python download_model.py
-   ```
-   
-   The script will download the model files to `models/mistral_thinking_abl2/` directory.
+# Download the models using Docker (recommended)
+docker run --rm -v $(pwd):/app -w /app --env-file .env mistral-nli-ft python3 models/download_model.py
+```
 
-2. **Using the Docker-based download_checkpoints.sh script**:
-   For downloading the complete model with all checkpoints:
+This will download all necessary adapter files for multiple model variations. See `models/README.md` for more details on the available models.
 
-   > **Important Note**: The Hugging Face repository is **private** and requires authentication. You must have access to the repository and provide a valid Hugging Face token to download the model.
+> **Note**: The script only downloads the small LoRA adapter files (~600MB). The base Mistral-7B model will be automatically downloaded during first inference.
 
-   ```bash
-   # Set your Hugging Face token as an environment variable
-   export HF_TOKEN=your_hugging_face_token_here
+## Running Inference
 
-   # Download the model
-   ./models/download_checkpoints.sh
+After downloading the models, you can run inference on your data:
 
-   # Or provide the token directly
-   ./models/download_checkpoints.sh --token your_hugging_face_token_here
-   ```
+```bash
+# Using the recommended model on the demo dataset
+./run_inference.sh --model models/Mistral_Thinking_Abl2/checkpoint-2000 --data data/sample/demo.csv
+
+# Using a different model on the test dataset
+./run_inference.sh --model models/Mistral_Thinking_Abl0 --data data/original_data/test.csv
+```
+
+Results will be saved in the `results/` directory as JSON and CSV files.
 
 ## Repository Structure
 
 ```
 .
-├── Dockerfile
-├── requirements.txt
+├── Dockerfile                  # Docker configuration for the environment
+├── requirements.txt            # Python dependencies
+├── .env                        # Environment variables file (for HF_TOKEN)
 ├── prompts.py                  # Centralized prompt template definitions
-├── train.sh                    # Main wrapper script for training with configs
+├── run_inference.sh            # Main inference script at project root
+├── run_training.sh             # Main training shell script (wraps train.sh)
 ├── train/                      # Training components
 │   ├── train_sft.py            # Main training implementation
 │   ├── config_loader.py        # Utility for loading config files
 │   └── configs/                # Python-based training configurations
 │       ├── default.py          # Base configuration for all training runs
-│       ├── initial_test_run.py # Configuration for initial test run
+│       ├── ablation0.py        # Configuration for Ablation 0 experiment
 │       ├── ablation1.py        # Configuration for Ablation 1 experiment
-│       └── ablation2.py        # Configuration for Ablation 2 experiment
+│       ├── ablation2.py        # Configuration for Ablation 2 experiment (main)
+│       └── ablation3.py        # Configuration for Ablation 3 experiment
 ├── evaluate/                   # Evaluation components
-│   ├── run_inference.sh        # Unified inference script with parameters
 │   ├── sample_model.py         # Core inference implementation
 │   └── README_INFERENCE.md     # Documentation for inference
 ├── data/
+│   ├── README.md               # Documentation for dataset structure and usage
+│   ├── download_data.py        # Script to download all datasets
 │   ├── original_data/          # Original NLI datasets (CSV)
 │   ├── original_thoughts/      # Original model thought processes (JSON)
 │   ├── reflected_thoughts/     # Reflected thought processes for incorrect examples (JSON)
 │   ├── sample/                 # Small sample datasets for quick testing
 │   └── finetune/               # Prepared data for fine-tuning (JSONL)
 ├── models/                     # Directory to store trained models/adapters
-│   ├── download_models.py      # Script to download model checkpoints
-│   ├── download_checkpoints.sh # Wrapper script for download_models.py
-│   └── README.md               # Documentation for using the checkpoints
+│   ├── README.md               # Documentation for downloading and using models
+│   ├── download_model.py       # Script to download model adapter files
+│   └── Mistral_Thinking_Abl*   # Downloaded model adapter directories
 ├── results/                    # Inference results (predictions, metrics)
 └── scripts/                    # Data preparation and utility scripts
     ├── generate_thoughts.py              # Script for augmenting original dataset with CoT data
