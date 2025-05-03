@@ -39,9 +39,10 @@ LOCAL_MODEL_DIR = Path("models")
 
 # List of checkpoint model paths to upload
 MODEL_PATHS = [
+    "mistral-thinking-default-epochs2",
     # "mistral-thinking-abl0",
-    "mistral-thinking-abl0-ext",
-    "mistral-thinking-abl0-merged"
+    # "mistral-thinking-abl0-ext",
+    # "mistral-thinking-abl0-merged"
     # "mistral-thinking-abl0_dist",
     # "mistral-thinking-abl1",
     # "mistral-thinking-abl2",

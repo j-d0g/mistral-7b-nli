@@ -13,7 +13,7 @@ from configs.default import *
 
 # Model and data paths
 output_dir = "models/mistral-thinking-abl0-final"
-data_dir = "data/finetune/train_ft_final.jsonl"
+data_dir = "data/finetune/train_ft_final.jsonl" # Train on final dataset that merges train and test set we allocated.
 
 # Training parameters
 batch_size = 8
@@ -28,12 +28,12 @@ lora_dropout = 0.05
 
 # Wandb
 use_wandb = True
-wandb_run_id = None
+wandb_run_id = None  # <-- PASTE YOUR RUN ID HERE
 wandb_project = "mistral_thinking_nli"
 wandb_name = "ablation0-final"
 
 # Other settings
 use_packing = False
 gradient_checkpointing = False
-resume_from_checkpoint = None
+resume_from_checkpoint = output_dir # Resume from the output directory
 gpu_id = 0

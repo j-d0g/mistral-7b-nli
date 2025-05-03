@@ -13,7 +13,6 @@ from configs.default import *
 
 # Model and data paths
 output_dir = "models/mistral-thinking-abl0-ext-merged"
-data_dir = "data/finetune/train_ft.jsonl"
 
 # Training parameters
 num_epochs = 1

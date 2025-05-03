@@ -34,13 +34,14 @@ LOCAL_MODEL_DIR = Path("models")
 
 # List of checkpoint model paths to download
 MODEL_PATHS = [
+    "mistral-thinking-default-epochs2", # Best model
     # "mistral-thinking-abl0",
-    "mistral-thinking-abl0-ext", # Best model
-    "mistral-thinking-abl0-merged",
+    # "mistral-thinking-abl0-ext", # Second Best Model
+    # "mistral-thinking-abl0-merged"
     # "mistral-thinking-abl0_dist",
     # "mistral-thinking-abl1",
-    # "mistral-thinking-abl2",
-    # "mistral-thinking-abl3",
+    # "mistral-thinking-abl2", # Third Best Model
+    # "mistral-thinking-abl3", # Second Best Model
     # "mistral-7b-nli-cot"
 ]
 
