@@ -1,0 +1,76 @@
+import os
+import sys
+from pathlib import Path
+from huggingface_hub import hf_hub_download, HfApi, list_repo_files
+
+# Get HF token from environment variables
+HF_TOKEN = os.getenv("HF_TOKEN")
+if not HF_TOKEN:
+    print("Error: HF_TOKEN not found in environment variables")
+    sys.exit(1)
+
+# User info
+USERNAME = "jd0g"
+REPO_NAME = "Mistral-v0.3-Thinking_NLI"
+REPO_ID = f"{USERNAME}/{REPO_NAME}"
+LOCAL_MODEL_DIR = Path("models")
+
+# List of checkpoint model paths to download
+MODEL_PATHS = [
+    "Mistral_Thinking_Abl0",
+    "Mistral_Thinking_Abl0/checkpoint-2225",
+    "Mistral_Thinking_Abl1/checkpoint-1250",
+    "Mistral_Thinking_Abl2/checkpoint-2000"
+]
+
+# Create the model directory if it doesn't exist
+os.makedirs(LOCAL_MODEL_DIR, exist_ok=True)
+
+print(f"Downloading model files from {REPO_ID}...")
+
+try:
+    # Download required files for each model path
+    for MODEL_PATH in MODEL_PATHS:
+        print(f"\nDownloading files for {MODEL_PATH}...")
+        
+        # Define required files for this model path
+        required_files = [
+            f"{MODEL_PATH}/adapter_config.json",
+            f"{MODEL_PATH}/adapter_model.safetensors",
+            f"{MODEL_PATH}/special_tokens_map.json",
+            f"{MODEL_PATH}/tokenizer.model",
+            f"{MODEL_PATH}/tokenizer.json",
+            f"{MODEL_PATH}/tokenizer_config.json"
+        ]
+        
+        # Create model path directory
+        model_dir = LOCAL_MODEL_DIR / MODEL_PATH
+        os.makedirs(model_dir, exist_ok=True)
+        
+        # Download each required file
+        for file_path in required_files:
+            try:
+                print(f"Downloading: {file_path}")
+                try:
+                    hf_hub_download(
+                        repo_id=REPO_ID,
+                        filename=file_path,
+                        token=HF_TOKEN,
+                        local_dir=LOCAL_MODEL_DIR,
+                        local_dir_use_symlinks=False
+                    )
+                    print(f"✓ Downloaded {file_path}")
+                except Exception as e:
+                    if "404" in str(e):
+                        print(f"⚠ File not found: {file_path} (skipping)")
+                    else:
+                        print(f"⚠ Error downloading {file_path}: {e}")
+            except Exception as e:
+                print(f"⚠ Error processing {file_path}: {e}")
+    
+    print("\nDownload complete!")
+except Exception as e:
+    print(f"Error accessing repository: {e}")
+    sys.exit(1)
+
+print(f"Model files downloaded to: {LOCAL_MODEL_DIR}") 
