@@ -15,7 +15,7 @@ lora_alpha = 32
 lora_dropout = 0.05
 
 # Training parameters
-num_epochs = 3
+num_epochs = 5
 max_seq_length = 512
 batch_size = 16
 grad_accumulation_steps = 2
@@ -32,7 +32,7 @@ save_steps = 250
 save_total_limit = 2
 
 # Wandb
-wandb_project = "mistral7b_cot"  # Default project name
+wandb_project = "mistral_thinking_nli"  # Default project name
 wandb_run_name = None  # Will be generated if not specified
 wandb_run_id = None
 

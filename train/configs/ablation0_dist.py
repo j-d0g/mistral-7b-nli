@@ -15,7 +15,7 @@ from configs.default import *
 output_dir = "models/mistral-thinking-ablation0-dist"
 
 # Training parameters
-batch_size = 8
+batch_size = 16
 grad_accumulation_steps = 1  # Effective batch size: 16
 learning_rate = 2e-4
 warmup_ratio = 0.03

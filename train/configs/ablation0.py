@@ -15,11 +15,10 @@ from configs.default import *
 output_dir = "models/mistral-7b-nli-cot-ablation0"
 
 # Training parameters
-batch_size = 8
-grad_accumulation_steps = 2  # Effective batch size: 16
-learning_rate = 2e-4
+batch_size = 16
+grad_accumulation_steps = 1  # Effective batch size: 16
+learning_rate = 1e-4
 warmup_ratio = 0.03
-num_epochs = 2
 
 # LoRA parameters
 lora_r = 16
@@ -28,11 +27,12 @@ lora_dropout = 0.05
 
 # Wandb
 use_wandb = True
-wandb_run_id = "jnz6en9a"
-wandb_project = "mistral7b_cot"
+wandb_run_id = None
+wandb_project = "mistral_thinking_nli"
 wandb_name = "ablation0"
 
 # Other settings
 use_packing = False
 gradient_checkpointing = True
 resume_from_checkpoint = None
+gpu_id = 0

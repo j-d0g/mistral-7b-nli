@@ -24,7 +24,7 @@ lora_dropout = 0.05
 # Wandb
 use_wandb = True
 wandb_run_id = None
-wandb_project = "mistral7b_cot"
+wandb_project = "mistral_thinking_nli"
 wandb_name = "ablation2"
 
 # Other settings

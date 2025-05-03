@@ -24,7 +24,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [ "$USE_ALL_GPUS" = true ]; then
-  # Use all available GPUs
+  # Use all available GPUs with distributed training
   echo "Using all available GPUs"
   docker run --rm \
     --gpus all \
@@ -33,8 +33,8 @@ if [ "$USE_ALL_GPUS" = true ]; then
     --env-file .env \
     mistral-nli-ft \
     torchrun --nproc_per_node=$(nvidia-smi --list-gpus | wc -l) train/train_sft.py --distributed_training True "$@"
-else
-  # Use specified GPUs
+elif [[ "$GPU_IDS" == *","* ]]; then
+  # Multiple specific GPUs with distributed training
   echo "Using GPUs: $GPU_IDS"
   docker run --rm \
     --gpus "device=$GPU_IDS" \
@@ -43,4 +43,14 @@ else
     --env-file .env \
     mistral-nli-ft \
     torchrun --nproc_per_node=$(echo $GPU_IDS | tr ',' '\n' | wc -l) train/train_sft.py --distributed_training True "$@"
+else
+  # Single GPU, no distributed training
+  echo "Using GPU: $GPU_IDS"
+  docker run --rm \
+    --gpus "device=$GPU_IDS" \
+    -v "$(pwd):/app" \
+    -v "$(pwd)/hf_cache:/root/.cache/huggingface" \
+    --env-file .env \
+    mistral-nli-ft \
+    python3 train/train_sft.py "$@"
 fi 
