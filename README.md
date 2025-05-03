@@ -2,33 +2,6 @@
 
 This project focuses on fine-tuning the Mistral-7B language model for Natural Language Inference (NLI) tasks, specifically using Chain-of-Thought (CoT) reasoning to improve classification performance and interpretability.
 
-## Quick Start
-
-Here's the fastest path to get up and running with this project:
-
-```bash
-# 1. Clone the repository (if you haven't already)
-git clone https://github.com/yourusername/mistral-7b-nli.git
-cd mistral-7b-nli
-
-# 2. Create a .env file with your Hugging Face token
-echo "HF_TOKEN=your_token_here" > .env
-
-# 3. Build the Docker container
-docker build -t mistral-nli-ft .
-
-# 4. Download the datasets
-docker run --rm -v $(pwd):/app -w /app --env-file .env mistral-nli-ft python3 data/download_data.py
-
-# 5. Download the models
-docker run --rm -v $(pwd):/app -w /app --env-file .env mistral-nli-ft python3 models/download_model.py
-
-# 6. Run inference with the best model on the sample dataset
-./run_inference.sh --model models/Mistral_Thinking_Abl2/checkpoint-2000 --data data/sample/demo.csv
-```
-
-See the sections below for more detailed instructions.
-
 ## Project Goal
 
 The primary objective is to instruction-tune Mistral-7B using a custom NLI dataset augmented with CoT reasoning. The final model should accurately classify premise-hypothesis pairs as either entailment (1) or no-entailment (0), maximizing performance on a hidden test set.
@@ -56,6 +29,13 @@ docker build -t mistral-nli-ft .
 
 # Download datasets through Docker
 docker run --rm -v $(pwd):/app -w /app mistral-nli-ft python3 data/download_data.py
+
+# Method 2: Set up a virtual environment (if not using Docker)
+python3 -m venv venv
+source venv/bin/activate
+pip install requests tqdm python-dotenv
+cd data
+python3 download_data.py
 ```
 
 The script will:
@@ -73,36 +53,46 @@ We've optimized the inference process to efficiently process the 1977-sample NLI
 
 ### Optimization Techniques
 
-1. **4-bit Quantization**: Using `bitsandbytes` for efficient memory usage
-2. **Batch Processing**: Optimized batch sizes for maximizing throughput
-3. **Sequence Length Reduction**: Reduced from 2048 → 512 tokens (with actual inputs ranging from 212-465 tokens)
-4. **Checkpoint System**: Saves progress every batch and can resume from interruptions
-5. **Consistent Prompting**: Uses the exact prompt format from fine-tuning for optimal results
-6. **Flexible Data Handling**: Automatically detects labeled vs. unlabeled datasets and adapts behavior
+1. **4-bit Quantization**: Using `bitsandbytes` for efficient memory usage. Specifically, it uses `nf4` (Normal Float 4-bit) quantization with double quantization enabled to further reduce memory footprint, allowing 7B models to run on consumer GPUs (like RTX 4090 with ~16GB VRAM usage) while maintaining reasonable accuracy.
+2. **Batch Processing**: Optimized batch sizes (default 32 via `run_inference.sh`, configurable in `sample_model.py`) for maximizing throughput while managing memory.
+3. **Sequence Length Reduction**: Reduced from potential 2048 → 512 tokens based on analysis showing optimal CoT accuracy in the 250-400 token range, significantly reducing computational load (attention complexity scales quadratically) and memory requirements.
+4. **Flash Attention 2**: Leverages Flash Attention if available for faster processing.
+5. **Checkpoint System**: The underlying `sample_model.py` saves progress every batch and can resume from interruptions (though the wrapper runs it as one process).
+6. **Consistent Prompting**: Uses the exact prompt format (`[INST]...[/INST]`) from fine-tuning for optimal results.
+7. **Flexible Data Handling**: Automatically detects labeled vs. unlabeled datasets and adapts behavior (calculating accuracy if labels are present).
+8. **Chain-of-Thought Support Rationale**: Incorporating CoT generation during inference improves accuracy on complex NLI examples and provides interpretable reasoning paths, allowing better analysis of the model's decision-making process.
 
 ### Performance Gains
 
 * Initial runtime estimate: ~2hr42min with batch size 8
 * Optimized runtime: ~50min with batch size 32 (>3x speedup)
-* GPU Memory Usage: 15.7GB/24GB VRAM (efficient usage while maintaining performance)
+* GPU Memory Usage: ~16GB/24GB VRAM with batch size 32 (efficient usage while maintaining performance).
+
+### Performance Characteristics (Observed on RTX 4090)
+- **GPU Memory**: ~16GB VRAM (4-bit quantized model with batch size 32)
+- **CPU**: Moderate usage (tokenization, post-processing)
+- **Disk**: ~15GB for base model cache, minimal for results/adapters
+- **Processing Rate**: ~1-2 samples per second (dependent on batch size, exact model, CoT generation length)
+- **Total Runtime (1977 samples)**: ~50 minutes (batch size 32), adjusts with batch size.
+- **CoT Reasoning Impact**: Can be ~1.5-2x slower than direct classification depending on thought process length.
 
 ### Running Unified Inference
 
-Our consolidated inference script (`run_inference.sh`) handles all inference scenarios through a simple parameter system. The script automatically detects whether your dataset has labels and adjusts the output accordingly.
+Our consolidated inference script (`evaluate/run_inference.sh`) handles all inference scenarios through a simple parameter system. The script automatically detects whether your dataset has labels and adjusts the output accordingly.
 
 Example (basic usage from the repository root):
 ```bash
 # Run with default parameters (demo dataset and default model)
-./run_inference.sh
+./evaluate/run_inference.sh
 
 # Run with a specific model and dataset
-./run_inference.sh --model models/Mistral_Thinking_Abl0 --data data/original_data/test.csv
+./evaluate/run_inference.sh --model models/mistral-thinking-abl0 --data data/original_data/test.csv
 
 # Run with a specific checkpoint
-./run_inference.sh --model models/Mistral_Thinking_Abl2/checkpoint-2000
+./evaluate/run_inference.sh --model models/mistral-thinking-abl0/checkpoint-2000
 
 # Use a specific GPU
-./run_inference.sh --gpu 1 
+./evaluate/run_inference.sh --gpu 1
 ```
 
 This unified approach:
@@ -110,6 +100,33 @@ This unified approach:
 - Creates consistent, descriptively-named output files
 - Uses the same implementation for all scenarios
 - Provides better error handling and user feedback
+
+### Troubleshooting
+
+1.  **CUDA Out of Memory (OOM) Errors**: If you encounter errors like `torch.cuda.OutOfMemoryError`:
+    *   **Solution**: The most likely cause is the batch size. While the default is 32, try running `evaluate/sample_model.py` directly with a smaller `--batch_size` (e.g., 16, 8, or even 4). You cannot currently change the batch size via `run_inference.sh`. Refer to the "Advanced Usage" section in `evaluate/README.md` for direct script invocation examples.
+2.  **Slow Inference**:
+    *   Ensure Docker is correctly configured to use the NVIDIA GPU (`nvidia-docker` or equivalent setup). Check `nvidia-smi` inside the container.
+    *   Ensure Flash Attention 2 is installed and usable (should be handled by the Dockerfile).
+3.  **`FileNotFoundError`**:
+    *   Double-check the paths provided to `--model` and `--data`. Ensure the model adapter files (`adapter_config.json`, `adapter_model.bin`, etc.) exist within the specified model directory.
+4.  **Invalid Prediction Output / Low Accuracy**:
+    *   Ensure the model path points to the correct fine-tuned adapters.
+    *   Verify the input data format matches what the model was trained on.
+    *   Confirm the prompt structure used in `evaluate/sample_model.py` aligns with the fine-tuning prompt.
+
+### Output Files
+The script saves results in the `results/` directory with automatically generated, descriptive filenames:
+
+-   **JSON Output**: `results/[model_name]-[dataset_name]-[timestamp].json`
+    -   Contains detailed configuration, overall metrics (if labels exist), timing, and per-sample predictions including the generated `thought_process` and `predicted_label`.
+-   **CSV Output**: `results/[model_name]-[dataset_name]-[timestamp].csv`
+    -   A flattened version containing the original premise/hypothesis, the true label (if available), and the model's `predicted_label`.
+
+Where:
+-   `[model_name]` is derived from the path provided via `--model`.
+-   `[dataset_name]` is derived from the path provided via `--data`.
+-   `[timestamp]` is the execution time.
 
 ## Training with Configurations
 
@@ -171,9 +188,10 @@ This design separates infrastructure concerns (Docker, environment) from applica
 *   The script inputs the original thoughts and the reflected thoughts, filters for correct examples from the original dataset, and combines them with all the reflected examples.
 *   This approach ensures the highest quality training data: correct examples are reused as-is, while incorrect examples are replaced with their reflected, improved versions.
 *   The `scripts/prepare_finetuning_data.py` is also available for more general data preparation options.
-*   All outputs use Mistral-style instruction tags `[INST]...[/INST]` to frame the task, with the target completion being the JSON string containing the `thought_process` and `predicted_label`.
+*   All outputs use Mistral-style instruction tags `...` to frame the task, with the target completion being the JSON string containing the `thought_process` and `predicted_label`.
     ```
-    <s>[INST] Premise: ...\nHypothesis: ...\n\n...instruction... [/INST] {"thought_process": "...", "predicted_label": ...} </s>
+    Premise: ...\nHypothesis: ...\n\n...instruction... 
+    {"thought_process": "...", "predicted_label": ...} 
     ```
 
 ### 4. Fine-Tuning Strategy
@@ -197,7 +215,8 @@ We use QLoRA for parameter-efficient fine-tuning.
 
 *   A `Dockerfile` is provided to build a container image with all necessary dependencies (PyTorch, CUDA, Transformers, PEFT, TRL, bitsandbytes, wandb, etc.).
 *   Training and inference are executed within this Docker container on a remote workstation with GPUs.
-*   The train.sh script automatically handles mounting volumes, GPU selection, and running the Python code within the container.
+    *   **Rationale**: Guarantees a consistent and reproducible environment across different systems, resolving complex dependency issues (CUDA, PyTorch versions). Simplifies setup and allows volume mounting for efficient model caching.
+*   The `train.sh` and `run_inference.sh` scripts automatically handle mounting volumes, GPU selection, and running the Python code within the container.
 *   `requirements.txt` lists the Python dependencies installed in the Docker image.
 
 Before running training or inference, build the Docker image:
@@ -211,6 +230,30 @@ docker build -t mistral-nli-ft .
 *   During training, validation loss is monitored for early stopping and checkpointing.
 *   Validation accuracy, precision, recall, and F1 can also be tracked if a `compute_metrics` function is added to `run_sft.py`.
 
+### Evaluation Notes & Historical Context
+
+This section provides context on model performance based on evaluations run during development, including addressing initial challenges.
+
+**Performance after Fixing Extraction Logic:**
+
+Initial evaluations were impacted by flawed logic for extracting the final prediction from model outputs containing Chain-of-Thought reasoning. After implementing a more robust extraction method (handling multiple JSONs, avoiding simple string checks), the performance comparison on the dev set was:
+
+| Model                | Fixed Accuracy (Dev Set) | Notes                                      |
+| -------------------- | ------------------------ | ------------------------------------------ |
+| Base (Mistral-7B-v0.3) | ~53%                     | Original model without fine-tuning         |
+| Fine-tuned (Ablation 2)| ~91%                     | Significant improvement (+38% vs Base)     |
+| Checkpoint-1250      | ~82%                     | Early checkpoint showing good progress   |
+
+*(Note: Final performance is measured on the hidden test set)*
+
+**Key Historical Challenges Addressed:**
+
+1.  **Extraction Bias:** The original extraction logic incorrectly interpreted outputs containing `\"step 1:\"` as predicting label 1, artificially deflating the apparent performance of CoT-generating models.
+2.  **Multiple JSONs:** Fine-tuned models sometimes generated multiple JSON objects; the extraction logic needed refinement to correctly parse the intended one.
+3.  **Training Tokenizer Config:** An early training issue where `tokenizer.pad_token` was set to `tokenizer.eos_token` potentially hindered the model's ability to learn proper output termination. This was fixed in later training runs by adding a distinct `[PAD]` token.
+
+This context highlights the effectiveness of the fine-tuning process and the importance of robust evaluation procedures.
+
 ## Hugging Face Hub Repository
 
 Fine-tuned model checkpoints from various ablation runs are available on the Hugging Face Hub:
@@ -223,66 +266,68 @@ The Hub repository's README provides details on the available checkpoints and ho
 
 We provide convenient scripts to download the fine-tuned Mistral-7B NLI model from the Hugging Face repository:
 
-```bash
-# First, create a .env file with your Hugging Face token
-echo "HF_TOKEN=your_token_here" > .env
+1. **Using the download_model.py script (recommended)**:
+   This script will download only the essential adapter files needed for inference from the Mistral_Thinking_Abl2 checkpoint.
 
-# Download the models using Docker (recommended)
-docker run --rm -v $(pwd):/app -w /app --env-file .env mistral-nli-ft python3 models/download_model.py
-```
+   ```bash
+   # Navigate to the project root
+   cd /path/to/mistral-7b-nli
+   
+   # Create the models directory if it doesn't exist
+   mkdir -p models
+   
+   # Run the download script
+   python download_model.py
+   ```
+   
+   The script will download the model files to `models/mistral_thinking_abl2/` directory.
 
-This will download all necessary adapter files for multiple model variations. See `models/README.md` for more details on the available models.
+2. **Using the Docker-based download_checkpoints.sh script**:
+   For downloading the complete model with all checkpoints:
 
-> **Note**: The script only downloads the small LoRA adapter files (~600MB). The base Mistral-7B model will be automatically downloaded during first inference.
+   > **Important Note**: The Hugging Face repository is **private** and requires authentication. You must have access to the repository and provide a valid Hugging Face token to download the model.
 
-## Running Inference
+   ```bash
+   # Set your Hugging Face token as an environment variable
+   export HF_TOKEN=your_hugging_face_token_here
 
-After downloading the models, you can run inference on your data:
+   # Download the model
+   ./models/download_checkpoints.sh
 
-```bash
-# Using the recommended model on the demo dataset
-./run_inference.sh --model models/Mistral_Thinking_Abl2/checkpoint-2000 --data data/sample/demo.csv
-
-# Using a different model on the test dataset
-./run_inference.sh --model models/Mistral_Thinking_Abl0 --data data/original_data/test.csv
-```
-
-Results will be saved in the `results/` directory as JSON and CSV files.
+   # Or provide the token directly
+   ./models/download_checkpoints.sh --token your_hugging_face_token_here
+   ```
 
 ## Repository Structure
 
 ```
 .
-├── Dockerfile                  # Docker configuration for the environment
-├── requirements.txt            # Python dependencies
-├── .env                        # Environment variables file (for HF_TOKEN)
+├── Dockerfile
+├── requirements.txt
 ├── prompts.py                  # Centralized prompt template definitions
-├── run_inference.sh            # Main inference script at project root
-├── run_training.sh             # Main training shell script (wraps train.sh)
+├── train.sh                    # Main wrapper script for training with configs
 ├── train/                      # Training components
 │   ├── train_sft.py            # Main training implementation
 │   ├── config_loader.py        # Utility for loading config files
 │   └── configs/                # Python-based training configurations
 │       ├── default.py          # Base configuration for all training runs
-│       ├── ablation0.py        # Configuration for Ablation 0 experiment
+│       ├── initial_test_run.py # Configuration for initial test run
 │       ├── ablation1.py        # Configuration for Ablation 1 experiment
-│       ├── ablation2.py        # Configuration for Ablation 2 experiment (main)
-│       └── ablation3.py        # Configuration for Ablation 3 experiment
+│       └── ablation2.py        # Configuration for Ablation 2 experiment
 ├── evaluate/                   # Evaluation components
+│   ├── run_inference.sh        # Unified inference script with parameters
 │   ├── sample_model.py         # Core inference implementation
 │   └── README_INFERENCE.md     # Documentation for inference
 ├── data/
-│   ├── README.md               # Documentation for dataset structure and usage
-│   ├── download_data.py        # Script to download all datasets
 │   ├── original_data/          # Original NLI datasets (CSV)
 │   ├── original_thoughts/      # Original model thought processes (JSON)
 │   ├── reflected_thoughts/     # Reflected thought processes for incorrect examples (JSON)
 │   ├── sample/                 # Small sample datasets for quick testing
 │   └── finetune/               # Prepared data for fine-tuning (JSONL)
 ├── models/                     # Directory to store trained models/adapters
-│   ├── README.md               # Documentation for downloading and using models
-│   ├── download_model.py       # Script to download model adapter files
-│   └── Mistral_Thinking_Abl*   # Downloaded model adapter directories
+│   ├── download_models.py      # Script to download model checkpoints
+│   ├── download_checkpoints.sh # Wrapper script for download_models.py
+│   └── README.md               # Documentation for using the checkpoints
 ├── results/                    # Inference results (predictions, metrics)
 └── scripts/                    # Data preparation and utility scripts
     ├── generate_thoughts.py              # Script for augmenting original dataset with CoT data
