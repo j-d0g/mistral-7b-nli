@@ -10,6 +10,7 @@ from train.configs.default import *
 output_dir = "models/mistral-thinking-abl2"
 
 # Training parameters
+num_epochs = 2
 batch_size = 16
 grad_accumulation_steps = 1  # Effective batch size: 32
 learning_rate = 2e-4
@@ -29,5 +30,5 @@ wandb_name = "ablation2"
 
 # Other settings
 use_packing = False
-gradient_checkpointing = True
+gradient_checkpointing = False
 resume_from_checkpoint = None

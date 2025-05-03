@@ -6,7 +6,7 @@ Default configuration for Mistral-7B NLI fine-tuning.
 model_id = "mistralai/Mistral-7B-v0.3"
 train_data = "data/finetune/train_ft.jsonl"
 eval_data = "data/finetune/dev_ft.jsonl"
-output_dir = "models/mistral-7b-nli-cot"
+output_dir = "models/mistral-thinking"
 seed = 42
 
 # LoRA parameters

@@ -15,12 +15,12 @@ from configs.default import *
 output_dir = "models/mistral-thinking-abl1"
 
 # Training parameters
+num_epochs = 2
 batch_size = 16
 grad_accumulation_steps = 2  # Effective batch size: 32
 learning_rate = 2e-4
 warmup_ratio = 0.05 # 5% warmup
 max_seq_length = 512
-
 # LoRA parameters
 lora_r = 16
 lora_alpha = 32
@@ -34,5 +34,5 @@ wandb_name = "ablation1"
 
 # Other settings
 use_packing = False
-gradient_checkpointing = True
+gradient_checkpointing = False
 resume_from_checkpoint = None

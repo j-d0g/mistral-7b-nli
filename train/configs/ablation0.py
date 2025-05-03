@@ -12,9 +12,11 @@ sys.path.insert(0, os.path.dirname(current_dir))
 from configs.default import *
 
 # Model and data paths
-output_dir = "models/mistral-thinking-abl0-ext"
+output_dir = "models/mistral-thinking-abl0-ext-merged"
+data_dir = "data/finetune/train_ft.jsonl"
 
 # Training parameters
+num_epochs = 1
 batch_size = 8
 grad_accumulation_steps = 2  # Effective batch size: 16
 learning_rate = 2e-4
@@ -33,6 +35,6 @@ wandb_name = "ablation0"
 
 # Other settings
 use_packing = False
-gradient_checkpointing = True
+gradient_checkpointing = False
 resume_from_checkpoint = None
 gpu_id = 0
