@@ -4,8 +4,8 @@ This document provides detailed instructions for running the various scripts in 
 
 ## Table of Contents
 
-1. [Initial Thought Generation](#initial-thought-generation)
-2. [Reflection on Incorrect Examples](#reflection-on-incorrect-examples)
+1. [Generate Thoughts](#generate-thoughts)
+2. [Generate Reflected Thoughts](#generate-reflected-thoughts)
 3. [Scoring Thought Processes](#scoring-thought-processes)
 4. [Preparing Fine-Tuning Data](#preparing-fine-tuning-data)
 5. [Complete Pipeline](#complete-pipeline)
@@ -230,7 +230,7 @@ For a test run of the entire pipeline on sample data:
 
 ```bash
 # Step 1: Generate initial thoughts
-python scripts/generate_thoughts.py --api mistral --model-name open-mistral-7b
+python scripts/generate_thoughts.py --input-csv data/original_data/train.csv --output-json data/original_thoughts/train_thoughts.json --api mistral --model-name open-mistral-7b --workers 6
 
 # Step 2: Generate reflections for incorrect examples
 python scripts/generate_thoughts_reflected.py --api mistral --model-name open-mistral-nemo
