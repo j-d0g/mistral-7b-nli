@@ -20,13 +20,8 @@ This document provides a comprehensive guide to fine-tuning the Mistral-7B model
     *   [5.2 Key Training Hyperparameters (`SFTConfig`)](#52-key-training-hyperparameters-sftconfig)
     *   [5.3 Sequence Length Optimization](#53-sequence-length-optimization)
 6.  [Running Training](#6-running-training)
-7.  [Distributed Training](#7-distributed-training)
-    *   [7.1 When to Use Distributed Training](#71-when-to-use-distributed-training)
-    *   [7.2 Distributed Configuration](#72-distributed-configuration)
-    *   [7.3 Launching Distributed Training](#73-launching-distributed-training)
-    *   [7.4 Special Considerations](#74-special-considerations)
-8.  [Weights & Biases Integration](#8-weights--biases-integration)
-9.  [Troubleshooting & Common Issues](#9-troubleshooting--common-issues)
+7.  [Weights & Biases Integration](#7-weights--biases-integration)
+8.  [Troubleshooting & Common Issues](#8-troubleshooting--common-issues)
 
 ---
 
@@ -83,7 +78,7 @@ Given the size of Mistral-7B (7 billion parameters), full fine-tuning requires s
 
 *   **Quantization:** The base model weights are loaded in 4-bit precision using the NF4 ("NormalFloat 4") data type via the `bitsandbytes` library. Double quantization is often enabled for further memory savings. This drastically reduces the memory needed to hold the base model weights.
 *   **LoRA (Low-Rank Adaptation):** Instead of updating all model weights, small, trainable "adapter" matrices are injected into specific layers of the frozen, quantized base model. Typically, these are applied to the attention mechanism's query (`q_proj`), key (`k_proj`), value (`v_proj`), and output (`o_proj`) linear layers. Only these adapter weights (a small fraction of the total parameters) are trained.
-*   **Compute Precision (`bfloat16`):** While weights are stored in 4-bit, computations (like matrix multiplications during forward and backward passes) are performed using a higher precision format. `bfloat16` (Brain Floating Point) is preferred over `float16` for training stability, especially with newer GPU architectures, although it requires careful handling to avoid dtype mismatches (see [Section 9](#9-troubleshooting--common-issues)).
+*   **Compute Precision (`bfloat16`):** While weights are stored in 4-bit, computations (like matrix multiplications during forward and backward passes) are performed using a higher precision format. `bfloat16` (Brain Floating Point) is preferred over `float16` for training stability, especially with newer GPU architectures, although it requires careful handling to avoid dtype mismatches (see [Section 8](#8-troubleshooting--common-issues)).
 
 ### 2.3 Docker Environment
 
@@ -214,56 +209,7 @@ This script handles:
 
 ---
 
-## 7. Distributed Training
-
-For accelerating training or handling larger models, the project supports distributed training across multiple GPUs.
-
-### 7.1 When to Use Distributed Training
-
-Consider distributed training in these scenarios:
-*   You have access to multiple GPUs and want to speed up training.
-*   Your batch size or model is too large for a single GPU, even with QLoRA.
-*   You're training for more epochs and want to reduce total training time.
-
-### 7.2 Distributed Configuration
-
-The repository includes a dedicated configuration file for distributed training: `train/configs/distributed.py`. Key parameters include:
-
-*   **Device Mapping:**
-    *   Set `device_map="auto"` in the model loading step to let Hugging Face automatically distribute model layers across available GPUs.
-    *   Alternatively, specify a custom mapping like `{"": 0}` (to force all to GPU 0) if needed.
-*   **Training Strategy:**
-    *   The `SFTConfig` in distributed mode typically uses PyTorch's Distributed Data Parallel (DDP) backend.
-    *   The configuration automatically handles the necessary DDP setup.
-*   **Batch Size Considerations:**
-    *   In distributed mode, the effective batch size becomes `per_device_train_batch_size * num_gpus * gradient_accumulation_steps`.
-    *   You may need to adjust the learning rate based on this effective batch size.
-
-### 7.3 Launching Distributed Training
-
-To run distributed training:
-
-```bash
-# Using the distributed configuration with all available GPUs
-./run_training.sh --config train/configs/distributed.py
-
-# Specify which GPUs to use (e.g., use GPU 0 and 1)
-CUDA_VISIBLE_DEVICES=0,1 ./run_training.sh --config train/configs/distributed.py
-
-# Override distributed config parameters
-./run_training.sh --config train/configs/distributed.py --per_device_train_batch_size 2 --gradient_accumulation_steps 4
-```
-
-### 7.4 Special Considerations
-
-*   **Memory Optimization:** For large models, memory may be unevenly distributed. The `device_map` parameter can be adjusted for better balance.
-*   **Communication Overhead:** There's a trade-off between distributing computation and communication overhead. For smaller batch sizes or fewer GPUs, single-GPU training might actually be more efficient.
-*   **Checkpoint Compatibility:** Models trained with distributed settings can still be loaded on a single GPU for inference.
-*   **Docker Considerations:** The `run_training.sh` script handles the necessary Docker configuration to expose all specified GPUs to the container.
-
----
-
-## 8. Weights & Biases Integration
+## 7. Weights & Biases Integration
 
 Weights & Biases (WandB) is integrated for experiment tracking.
 
@@ -281,7 +227,7 @@ Weights & Biases (WandB) is integrated for experiment tracking.
 
 ---
 
-## 9. Troubleshooting & Common Issues
+## 8. Troubleshooting & Common Issues
 
 Fine-tuning large models can be challenging. Here are common issues and potential solutions encountered during this project, largely based on details originally in `train/FINETUNE_GUIDE.md`:
 
