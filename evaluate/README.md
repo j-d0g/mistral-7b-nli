@@ -11,7 +11,7 @@ This guide explains how to run inference using the fine-tuned Mistral-7B NLI mod
 
 ## Optimized Inference Workflow
 
-The inference process (`evaluate/run_inference.sh` wrapping `evaluate/sample_model.py`) is optimized for efficiency:
+The inference process (`run_inference.sh` wrapping `evaluate/sample_model.py`) is optimized for efficiency:
 
 1.  **4-bit Quantization**: Uses `bitsandbytes` for loading the base model in 4-bit, reducing memory usage significantly. The LoRA adapters are then applied on top.
 2.  **Batch Processing**: Processes the input data in batches (default size 32, configurable in `sample_model.py`) to maximize GPU throughput.
@@ -31,16 +31,16 @@ The recommended way to run inference is using the unified wrapper script from th
 
 ```bash
 # Run with default parameters (uses models/mistral-7b-nli-cot and data/sample/demo.csv)
-./evaluate/run_inference.sh
+./run_inference.sh
 
 # Run with a specific model adapter directory and test dataset
-./evaluate/run_inference.sh --model models/mistral_thinking_abl2 --data data/original_data/test.csv
+./run_inference.sh --model models/Mistral_Thinking_Abl2/checkpoint-2000 --data data/original_data/test.csv
 
 # Run inference using a specific checkpoint from a training run
-./evaluate/run_inference.sh --model models/mistral-7b-nli-cot-ablation2/checkpoint-500 --data data/finetune/dev_ft.jsonl
+./run_inference.sh --model models/Mistral_Thinking_Abl2/checkpoint-2000 --data data/finetune/dev_ft.jsonl
 
 # Specify the GPU to use (default is GPU 0)
-./evaluate/run_inference.sh --model models/mistral_thinking_abl2 --data data/original_data/test.csv --gpu 1
+./run_inference.sh --model models/Mistral_Thinking_Abl2/checkpoint-2000 --data data/original_data/test.csv --gpu 1
 ```
 
 ### Script Parameters
@@ -93,7 +93,7 @@ docker run --rm --gpus device=0 \
   -w /app \
   mistral-nli-ft \
   python evaluate/sample_model.py \
-    --model_id "models/mistral_thinking_abl2" \
+    --model_id "models/Mistral_Thinking_Abl2/checkpoint-2000" \
     --test_file "data/original_data/test.csv" \
     --output_file "results/custom_run_predictions.json" \
     --batch_size 64 \

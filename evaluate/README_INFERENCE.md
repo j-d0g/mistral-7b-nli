@@ -16,16 +16,16 @@ We provide a unified inference script that handles all inference scenarios throu
 
 ```bash
 # Run with default parameters (demo dataset and default model)
-./evaluate/run_inference.sh
+./run_inference.sh
 
 # Run with a specific model and dataset
-./evaluate/run_inference.sh --model models/mistral-thinking-abl0 --data data/original_data/test.csv
+./run_inference.sh --model models/Mistral_Thinking_Abl0 --data data/original_data/test.csv
 
 # Run with a specific checkpoint
-./evaluate/run_inference.sh --model models/mistral-thinking-abl0/checkpoint-2000
+./run_inference.sh --model models/Mistral_Thinking_Abl2/checkpoint-2000
 
 # Use a specific GPU
-./evaluate/run_inference.sh --gpu 1
+./run_inference.sh --gpu 1
 ```
 
 ### Available Parameters
@@ -70,7 +70,7 @@ docker run --rm --gpus device=0 \
   -w /app \
   mistral-nli-ft \
   python evaluate/sample_model.py \
-  --model_id "models/mistral-thinking-abl0/checkpoint-2000" \
+  --model_id "models/Mistral_Thinking_Abl2/checkpoint-2000" \
   --test_file "data/original_data/test.csv" \
   --output_file "results/custom-predictions.json" \
   --batch_size 32 \
