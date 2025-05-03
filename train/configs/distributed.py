@@ -1,12 +1,13 @@
 """
-Default configuration for Mistral-7B NLI fine-tuning.
+Distributed training configuration for Mistral-7B NLI fine-tuning.
+Optimized for 2x NVIDIA RTX 4090 GPUs.
 """
 
 # Model and data paths
 model_id = "mistralai/Mistral-7B-v0.3"
 train_data = "data/finetune/train_ft.jsonl"
 eval_data = "data/finetune/dev_ft.jsonl"
-output_dir = "models/mistral-7b-nli-cot"
+output_dir = "models/mistral-7b-nli-cot-distributed"
 seed = 42
 
 # LoRA parameters
@@ -14,10 +15,11 @@ lora_r = 16
 lora_alpha = 32
 lora_dropout = 0.05
 
-# Training parameters
+# Training parameters - adjusted for 2x 4090 GPUs
+# We can increase the batch size since we have 2 GPUs
 num_epochs = 3
 max_seq_length = 512
-batch_size = 16
+batch_size = 8  # Per-GPU batch size
 grad_accumulation_steps = 2
 learning_rate = 2e-4
 lr_scheduler = "cosine"
@@ -32,16 +34,15 @@ save_steps = 250
 save_total_limit = 2
 
 # Wandb
-wandb_project = "mistral7b_cot"  # Default project name
+wandb_project = "mistral7b_cot_distributed"
 wandb_run_name = None  # Will be generated if not specified
 wandb_run_id = None
 
 # Other settings
 use_packing = False
-gradient_checkpointing = True
+gradient_checkpointing = True  # Important for memory efficiency
 use_wandb = True
 resume_from_checkpoint = None
-gpu_id = 0 
 
 # Distributed training settings
-distributed_training = False 
+distributed_training = True 

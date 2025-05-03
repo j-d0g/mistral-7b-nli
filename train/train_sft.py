@@ -12,6 +12,8 @@ import torch.nn as nn
 import argparse
 from torch.cuda.amp import autocast
 from pathlib import Path
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
 
 from datasets import load_dataset
 from peft import LoraConfig, prepare_model_for_kbit_training
@@ -76,6 +78,10 @@ def parse_args():
     parser.add_argument("--wandb_run_id", type=str, help="Wandb run ID to resume")
     parser.add_argument("--gpu_id", type=int, help="GPU ID to use")
     
+    # Distributed training parameters
+    parser.add_argument("--distributed_training", type=bool, default=False, help="Enable distributed training")
+    parser.add_argument("--local_rank", type=int, default=-1, help="Local rank for distributed training")
+    
     return parser.parse_args()
 
 def load_and_merge_config(args):
@@ -132,7 +138,7 @@ def load_and_merge_config(args):
                 # Absolute minimal defaults as last resort fallback
                 minimal_defaults = {
                     'model_id': "mistralai/Mistral-7B-v0.3",
-                    'output_dir': "models/mistral-7b-nli-cot",
+                    'output_dir': "models/mistral-thinking",
                     'seed': 42,
                     'batch_size': 16,
                     'grad_accumulation_steps': 2
@@ -188,36 +194,67 @@ def main():
     args = parse_args()
     config = load_and_merge_config(args)
     
+    # Distributed training setup
+    distributed_training = config.get('distributed_training', False)
+    # Use the environment variable set by torchrun
+    local_rank = int(os.environ.get('LOCAL_RANK', -1))
+    
+    if distributed_training:
+        if local_rank != -1:
+            dist.init_process_group(backend='nccl')
+            torch.cuda.set_device(local_rank)
+            is_master = local_rank == 0
+        else:
+            is_master = True
+    else:
+        is_master = True
+    
     # Create output directory
-    os.makedirs(config['output_dir'], exist_ok=True)
+    if is_master:
+        os.makedirs(config['output_dir'], exist_ok=True)
     
     # Set random seed
-    set_seed(config['seed'])
+    set_seed(config['seed'] + local_rank if local_rank != -1 else config['seed'])
     
-    # Log key configuration (minimal)
-    logger.info(f"=== Training Configuration ===")
-    logger.info(f"Model: {config['model_id']}")
-    logger.info(f"Output directory: {config['output_dir']}")
-    effective_batch = config['batch_size'] * config['grad_accumulation_steps']
-    logger.info(f"Effective batch size: {effective_batch} (batch: {config['batch_size']}, grad_accum: {config['grad_accumulation_steps']})")
-    logger.info(f"Training epochs: {config['num_epochs']}")
-    logger.info(f"Learning rate: {config['learning_rate']}")
+    # Log key configuration (minimal) - only on master node
+    if is_master:
+        logger.info(f"=== Training Configuration ===")
+        logger.info(f"Model: {config['model_id']}")
+        logger.info(f"Output directory: {config['output_dir']}")
+        effective_batch = config['batch_size'] * config['grad_accumulation_steps']
+        if distributed_training:
+            world_size = dist.get_world_size()
+            effective_batch *= world_size
+            logger.info(f"Distributed training enabled with {world_size} GPUs")
+        
+        logger.info(f"Effective batch size: {effective_batch} (batch: {config['batch_size']}, grad_accum: {config['grad_accumulation_steps']})")
+        logger.info(f"Training epochs: {config['num_epochs']}")
+        logger.info(f"Learning rate: {config['learning_rate']}")
     
-    # Set the GPU ID to use
-    gpu_id = config.get('gpu_id', 0)
-    logger.info(f"Using GPU ID: {gpu_id}")
-    
-    # Set the environment variable to use the specific GPU
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
-    
-    # Log device info - note: now that we've set CUDA_VISIBLE_DEVICES, device 0 is actually
-    # the GPU we selected, so we don't use the gpu_id here
-    device_id = torch.cuda.current_device()  # Should always be 0 after setting CUDA_VISIBLE_DEVICES
-    device_name = torch.cuda.get_device_name(device_id)
-    logger.info(f"Using GPU: {device_name}")
+    # Set the GPU ID to use if not using distributed training
+    if not distributed_training:
+        gpu_id = config.get('gpu_id', 0)
+        if is_master:
+            logger.info(f"Using GPU ID: {gpu_id}")
+        
+        # Set the environment variable to use the specific GPU
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+        
+        # Log device info
+        device_id = torch.cuda.current_device()
+        device_name = torch.cuda.get_device_name(device_id)
+        if is_master:
+            logger.info(f"Using GPU: {device_name}")
+    else:
+        # When using distributed training, torch.distributed.launch handles GPU assignment
+        device_id = local_rank
+        device_name = torch.cuda.get_device_name(device_id)
+        if is_master:
+            logger.info(f"Master process using GPU: {device_name}")
     
     # Load datasets
-    logger.info("Loading datasets...")
+    if is_master:
+        logger.info("Loading datasets...")
     try:
         dataset = load_dataset("json", data_files={"train": config['train_data'], "eval": config['eval_data']})
     except Exception as e:
@@ -225,12 +262,14 @@ def main():
         return
 
     # Load tokenizer
-    logger.info(f"Loading tokenizer...")
+    if is_master:
+        logger.info(f"Loading tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(config['model_id'], trust_remote_code=True)
     
     # Add pad token if needed
     if tokenizer.pad_token is None:
-        logger.info("Adding [PAD] token to tokenizer")
+        if is_master:
+            logger.info("Adding [PAD] token to tokenizer")
         tokenizer.add_special_tokens({'pad_token': '[PAD]'}) 
         tokenizer.pad_token_id = tokenizer.convert_tokens_to_ids(tokenizer.pad_token)
     
@@ -246,7 +285,8 @@ def main():
         )
         
     # Process datasets
-    logger.info("Preprocessing datasets...")
+    if is_master:
+        logger.info("Preprocessing datasets...")
     try:
         processed_dataset = {
             'train': dataset['train'].map(
@@ -279,9 +319,13 @@ def main():
     # Load model
     logger.info("Loading quantized model...")
     try:
-        # Note: Since we've set CUDA_VISIBLE_DEVICES, we should map to device 0,
-        # which is actually the GPU specified by gpu_id
-        device_map = {"": 0}
+        # Handle device mapping correctly for distributed training
+        if distributed_training:
+            device_map = {"": torch.cuda.current_device()}
+            logger.info(f"Using device map: {device_map} for GPU {torch.cuda.current_device()}")
+        else:
+            # For single GPU training
+            device_map = {"": 0}
         
         model = AutoModelForCausalLM.from_pretrained(
             config['model_id'],
@@ -321,9 +365,19 @@ def main():
     )
     
     # Configure wandb if needed
-    if config['use_wandb'] and config.get('wandb_run_id'):
-        os.environ["WANDB_RESUME"] = "allow"
-        os.environ["WANDB_RUN_ID"] = config['wandb_run_id']
+    if config['use_wandb']:
+        if config.get('wandb_run_id'):
+            os.environ["WANDB_RESUME"] = "allow"
+            os.environ["WANDB_RUN_ID"] = config['wandb_run_id']
+        
+        # Set WandB project and run name if provided in config
+        if config.get('wandb_project'):
+            os.environ["WANDB_PROJECT"] = config['wandb_project']
+        
+        if config.get('wandb_name') or config.get('wandb_run_name'):
+            # Support both wandb_name and wandb_run_name for compatibility
+            run_name = config.get('wandb_name') or config.get('wandb_run_name')
+            os.environ["WANDB_NAME"] = run_name
     
     # Training args
     logger.info("Configuring training parameters...")
@@ -353,9 +407,12 @@ def main():
         metric_for_best_model="eval_loss",
         greater_is_better=False,
         report_to="wandb" if config['use_wandb'] else "none",
+        run_name=config.get('wandb_name') or config.get('wandb_run_name') or config['output_dir'],
         seed=config['seed'],
         remove_unused_columns=False,
         resume_from_checkpoint=config.get('resume_from_checkpoint'),
+        local_rank=local_rank if distributed_training else -1,
+        ddp_find_unused_parameters=False if distributed_training else None,
     )
 
     # Apply autocast to forward method
