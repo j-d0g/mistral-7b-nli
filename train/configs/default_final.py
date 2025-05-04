@@ -1,23 +1,46 @@
 """
-Configuration for Ablation 0: Longer Epochs on Merged Training Data
+Default configuration for Mistral-7B NLI fine-tuning.
 """
 
-# Import with a relative path that works both inside and outside Docker
-import sys
-import os
-current_dir = os.path.dirname(os.path.abspath(__file__))
-
-# Import the default config
-sys.path.insert(0, os.path.dirname(current_dir))
-from configs.default import *
-
 # Model and data paths
-output_dir = "models/mistral-thinking-default-final"
-train_data = "data/finetune/train_ft_final.jsonl" # Train on final dataset that merges train and test set we allocated.
+model_id = "mistralai/Mistral-7B-v0.3"
+train_data = "data/finetune/train_ft_final.jsonl"
+eval_data = "data/finetune/dev_ft.jsonl"
+output_dir = "models/mistral-thinking"
+seed = 42
 
-num_epochs = 5
+# LoRA parameters
+lora_r = 16
+lora_alpha = 32
+lora_dropout = 0.05
+
+# Training parameters
+num_epochs = 10
+max_seq_length = 512
+batch_size = 16
+grad_accumulation_steps = 2
+learning_rate = 1e-4
+lr_scheduler = "cosine"
+warmup_ratio = 0.006
+weight_decay = 0.01
+max_grad_norm = 1.0
+
+# Evaluation and logging
+logging_steps = 25
+eval_steps = 250
+save_steps = 250
+save_total_limit = 2
 
 # Wandb
+wandb_project = "mistral_thinking_nli"  # Default project name
+wandb_run_name = "default-final"  # Will be generated if not specified
+wandb_run_id = None
+
+# Other settings
+use_packing = False
+gradient_checkpointing = True
 use_wandb = True
-wandb_project = "mistral_thinking_nli"
-wandb_name = "default-final"
+resume_from_checkpoint = None
+
+# Distributed training settings
+distributed_training = False 

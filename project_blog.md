@@ -103,6 +103,17 @@ The fine-tuning process wasn't linear and involved several iterations based on o
 
 This iterative process demonstrates the importance of data quality and diversity. Addressing the shortcomings of the initial data generation (via reflection) was more impactful than simply increasing model capacity through higher LoRA ranks.
 
+### The Interplay of LR, Batch Size, and Warmup
+
+Further tuning revealed significant instability and sensitivity related to the learning rate schedule, particularly the warmup phase, when adjusting other parameters like batch size or total training duration:
+
+*   **Warmup Ratio Sensitivity:** Initial successful runs (like the default configuration) used `warmup_ratio = 0.03`. For a 2-epoch run with the default dataset size (~2224 steps), this translated to roughly 67 warmup steps. This seemed to be a sweet spot *for that specific training length*.
+*   **Dependency on Total Steps:** The core issue with `warmup_ratio` is that the *absolute number* of warmup steps changes if the total number of training steps changes (due to more epochs, different batch sizes, or different dataset sizes). A ratio that works well for a short run might be too short or too long for a longer run, potentially leading to instability or slow convergence.
+*   **Batch Size Interaction:** Experiments that varied the effective batch size (e.g., Ablation 1 using 32 vs. Ablation 0 using 16) showed poor results when other parameters like learning rate weren't adjusted accordingly. A learning rate suitable for a small batch size (like 2e-4 for 16) could become unstable with a larger batch size (32) without a corresponding reduction or a different warmup profile. This highlighted the need to co-tune LR and batch size.
+*   **Resuming Challenges:** Resuming training often failed to correctly restore the learning rate scheduler's state, leading to the scheduler restarting its warmup phase inappropriately mid-training. This caused sudden learning rate spikes, loss increases, and accuracy drops.
+
+**Decision:** To decouple the warmup phase from the total training length and enable more consistent comparisons across experiments with varying epochs or batch sizes, the approach was shifted from using `warmup_ratio` to specifying a **fixed number of `warmup_steps`**. This provides more direct control and makes tuning the initial learning phase more predictable and reproducible, especially when resuming training or adjusting the total training duration. It also simplifies diagnosing issues related to the learning rate schedule.
+
 ---
 
 ## Sequence Length Optimization: A Double Win
