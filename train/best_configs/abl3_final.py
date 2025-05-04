@@ -6,7 +6,7 @@ Default configuration for Mistral-7B NLI fine-tuning.
 model_id = "mistralai/Mistral-7B-v0.3"
 train_data = "data/finetune/train_ft_final.jsonl"
 eval_data = "data/finetune/dev_ft.jsonl"
-output_dir = "models/mistral-thinking"
+output_dir = "models/mistral-thinking-abl3-best"
 seed = 42
 
 # LoRA parameters
@@ -41,7 +41,6 @@ use_packing = False
 gradient_checkpointing = True
 use_wandb = True
 resume_from_checkpoint = None
-gpu_id = 0 
 
 # Distributed training settings
 distributed_training = False 

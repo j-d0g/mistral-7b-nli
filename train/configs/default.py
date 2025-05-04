@@ -6,7 +6,7 @@ Default configuration for Mistral-7B NLI fine-tuning.
 model_id = "mistralai/Mistral-7B-v0.3"
 train_data = "data/finetune/train_ft.jsonl"
 eval_data = "data/finetune/dev_ft.jsonl"
-output_dir = "models/mistral-thinking"
+output_dir = "models/mistral-thinking-default-checkpoint_off"
 seed = 42
 
 # LoRA parameters
@@ -15,13 +15,13 @@ lora_alpha = 32
 lora_dropout = 0.05
 
 # Training parameters
-num_epochs = 2
+num_epochs = 6
 max_seq_length = 512
 batch_size = 16
 grad_accumulation_steps = 2
 learning_rate = 2e-4
 lr_scheduler = "cosine"
-warmup_ratio = 0.03
+warmup_ratio = 0.01
 weight_decay = 0.01
 max_grad_norm = None  # No gradient clipping
 
@@ -38,7 +38,7 @@ wandb_run_id = None
 
 # Other settings
 use_packing = False
-gradient_checkpointing = True
+gradient_checkpointing = False
 use_wandb = True
 resume_from_checkpoint = None
 gpu_id = 0 
