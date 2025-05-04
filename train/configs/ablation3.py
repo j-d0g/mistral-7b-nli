@@ -16,7 +16,7 @@ from configs.default import *
 output_dir = "models/mistral-thinking-abl3"
 
 # Training parameters
-num_epochs = 2
+num_epochs = 10
 batch_size = 16
 grad_accumulation_steps = 4  # Effective batch size: 64
 learning_rate = 1e-4
@@ -33,7 +33,7 @@ lora_dropout = 0.05
 use_wandb = True
 wandb_run_id = None
 wandb_project = "mistral_thinking_nli"
-wandb_name = "ablation3"
+wandb_name = "ablation3_final"
 
 # Other settings
 use_packing = False

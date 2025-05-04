@@ -16,11 +16,11 @@ output_dir = "models/mistral-thinking-abl0-final"
 data_dir = "data/finetune/train_ft_final.jsonl" # Train on final dataset that merges train and test set we allocated.
 
 # Training parameters
+num_epochs = 5
 batch_size = 8
 grad_accumulation_steps = 2  # Effective batch size: 16
 learning_rate = 2e-4
 warmup_ratio = 0.03
-num_epochs = 5
 # LoRA parameters
 lora_r = 16
 lora_alpha = 32

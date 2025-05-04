@@ -3,8 +3,16 @@ Configuration for Ablation 1: Standard training run
 Based on the parameters from training_runs.md
 """
 
-# Import and extend defaults
-from train.configs.default import *
+# Import with a relative path that works both inside and outside Docker
+import sys
+import os
+current_dir = os.path.dirname(os.path.abspath(__file__))
+default_path = os.path.join(current_dir, 'default.py')
+
+# Import the default config
+sys.path.insert(0, os.path.dirname(current_dir))
+from configs.default import *
+
 
 # Model and data paths
 output_dir = "models/mistral-thinking-abl2"
