@@ -305,8 +305,6 @@ def main():
                     
                     # Check for valid response and write to output file
                     if response_json and 'predicted_label' in response_json and response_json['predicted_label'] != -1:
-                        json.dump(response_json, outfile)
-                        outfile.write('\n')
                         output_count += 1
                         if response_json['predicted_label'] == row['true_label']:
                             correct_count += 1
@@ -400,14 +398,12 @@ def main():
         
         # Write all results to the output file (ensure sorted by index for consistency)
         sorted_indices = sorted(results_dict.keys(), key=int)
-        with open(args.output_json, "a") as outfile:
-            for index_str in sorted_indices:
-                # Ensure we have the response key before dumping
-                if 'response' in results_dict[index_str]:
-                    json.dump(results_dict[index_str]['response'], outfile)
-                    outfile.write('\n')
-                else:
-                    logger.error(f"Missing 'response' key for index {index_str} in results_dict")
+        for index_str in sorted_indices:
+            # Ensure we have the response key before processing
+            if 'response' in results_dict[index_str]:
+                pass
+            else:
+                logger.error(f"Missing 'response' key for index {index_str} in results_dict")
         
         # Calculate overall statistics
         total_output = sum(result['output_count'] for result in worker_results)
