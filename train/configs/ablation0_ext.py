@@ -20,10 +20,6 @@ grad_accumulation_steps = 2  # Effective batch size: 16
 learning_rate = 2e-4
 warmup_ratio = 0.03
 num_epochs = 5
-# LoRA parameters
-lora_r = 16
-lora_alpha = 32
-lora_dropout = 0.05
 
 # Wandb
 use_wandb = True

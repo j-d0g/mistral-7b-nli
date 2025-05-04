@@ -35,5 +35,5 @@ wandb_name = "ablation0-final"
 # Other settings
 use_packing = False
 gradient_checkpointing = False
-resume_from_checkpoint = output_dir # Resume from the output directory
+resume_from_checkpoint = None # Resume from the output directory
 gpu_id = 0

@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(current_dir))
 from configs.default import *
 
 # Model and data paths
-output_dir = "models/mistral-thinking-abl3"
+output_dir = "models/mistral-thinking-abl3-final"
 train_data = "data/finetune/train_ft_final.jsonl" # Train on final dataset that merges train and test set we allocated.
 
 # Training parameters

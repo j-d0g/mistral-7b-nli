@@ -20,7 +20,7 @@ output_dir = "models/mistral-thinking-abl2"
 # Training parameters
 num_epochs = 2
 batch_size = 16
-grad_accumulation_steps = 1  # Effective batch size: 32
+grad_accumulation_steps = 1
 learning_rate = 2e-4
 warmup_ratio = 0.03
 max_seq_length = 512
