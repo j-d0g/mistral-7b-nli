@@ -21,6 +21,7 @@ grad_accumulation_steps = 2  # Effective batch size: 32
 learning_rate = 1e-4
 warmup_ratio = 0.05 # 5% warmup
 max_seq_length = 512
+
 # LoRA parameters
 lora_r = 16
 lora_alpha = 32

@@ -15,11 +15,11 @@ from configs.default import *
 output_dir = "models/mistral-thinking-abl0-ext"
 
 # Training parameters
-batch_size = 8
-grad_accumulation_steps = 2  # Effective batch size: 16
+batch_size = 16
+grad_accumulation_steps = 1  # Effective batch size: 16
 learning_rate = 2e-4
-warmup_ratio = 0.03
 num_epochs = 5
+warmup_steps = 100
 
 # Wandb
 use_wandb = True

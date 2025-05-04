@@ -76,7 +76,6 @@ def parse_args():
     parser.add_argument("--no_wandb", action="store_true", help="Disable Weights & Biases logging")
     parser.add_argument("--resume_from_checkpoint", type=str, help="Path to checkpoint to resume from, or 'latest'")
     parser.add_argument("--wandb_run_id", type=str, help="Wandb run ID to resume")
-    parser.add_argument("--gpu_id", type=int, help="GPU ID to use")
     
     # Distributed training parameters
     parser.add_argument("--distributed_training", type=bool, default=False, help="Enable distributed training")
@@ -233,18 +232,18 @@ def main():
     
     # Set the GPU ID to use if not using distributed training
     if not distributed_training:
-        gpu_id = config.get('gpu_id', 0)
-        if is_master:
-            logger.info(f"Using GPU ID: {gpu_id}")
-        
-        # Set the environment variable to use the specific GPU
-        os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
-        
-        # Log device info
-        device_id = torch.cuda.current_device()
-        device_name = torch.cuda.get_device_name(device_id)
-        if is_master:
-            logger.info(f"Using GPU: {device_name}")
+        # Log device info based on what PyTorch actually sees
+        if torch.cuda.is_available():
+            try:
+                device_id = torch.cuda.current_device()
+                device_name = torch.cuda.get_device_name(device_id)
+                if is_master:
+                    logger.info(f"PyTorch using GPU: {device_name} (CUDA Device ID {device_id} within container)")
+            except Exception as e:
+                 if is_master:
+                    logger.warning(f"Could not get CUDA device info: {e}")
+        elif is_master:
+             logger.warning("CUDA not available according to PyTorch.")
     else:
         # When using distributed training, torch.distributed.launch handles GPU assignment
         device_id = local_rank
