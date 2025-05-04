@@ -111,7 +111,7 @@ def main():
     parser = argparse.ArgumentParser(description="Prepare NLI CoT data for Ablation 2 (combining correct predictions and reflected thoughts).")
     parser.add_argument("--original-thoughts", type=str, default="data/original_thoughts/sample_thoughts.json", help="Path to the original thoughts JSON file. Defaults to sample_thoughts.json.")
     parser.add_argument("--reflected-thoughts", type=str, default="data/reflected_thoughts/sample_reflections.json", help="Path to the reflected thoughts JSON file. Defaults to sample_reflections.json.")
-    parser.add_argument("--output-file", type=str, default="data/finetune/sample_ablation2.jsonl", help="Path to save the processed JSON Lines file for fine-tuning. Defaults to sample_ablation2.jsonl.")
+    parser.add_argument("--output-file", type=str, default="data/finetune/sample_ft.jsonl", help="Path to save the processed JSON Lines file for fine-tuning. Defaults to sample_ablation2.jsonl.")
     
     args = parser.parse_args()
     

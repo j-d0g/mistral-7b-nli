@@ -18,6 +18,8 @@ The core data is organized as follows:
 
 > **Note:** All scripts default to using sample data if no specific paths are provided. This prevents accidental overwriting of important data during testing.
 
+For details on the data preparation pipeline, see [data/README.md](data/README.md).
+
 ### Downloading the Datasets
 
 We provide a convenient script to download all the necessary datasets from Hugging Face:
@@ -146,25 +148,7 @@ We've implemented a config-based training system inspired by Karpathy's NanoGPT 
 ./run_training.sh --config train/configs/ablation1.py --batch_size 8 --no_wandb
 ```
 
-### Benefits of the Configuration System:
-
-* **Declarative Configuration**: Parameters defined in clean Python files instead of bash scripts
-* **Intuitive Overrides**: Command-line parameters take precedence over config values
-* **Reduced Duplication**: Default values exist in only one place
-* **Self-Documenting Code**: Config files include comments and explanations
-* **Simplified Experimentation**: Create new configurations by copying and editing files
-* **Better Type Handling**: Proper typing of parameters (integers, floats, booleans)
-
-### Understanding the Training System
-
-The training system is composed of:
-
-1. **run_training.sh**: A minimal Docker wrapper script that passes arguments to the Python code
-2. **train/train_sft.py**: The main script that loads config and handles training
-3. **train/config_loader.py**: A utility for loading Python configuration files
-4. **train/configs/default.py**: Default configuration values for all training runs
-
-This design separates infrastructure concerns (Docker, environment) from application logic (training parameters, model configuration).
+For complete training instructions, see [TRAINING.md](TRAINING.md).
 
 ## Methodology
 
@@ -226,33 +210,17 @@ docker build -t mistral-nli-ft .
 
 ### 6. Evaluation
 
-*   Primary evaluation metric is accuracy on the hidden test set.
-*   During training, validation loss is monitored for early stopping and checkpointing.
-*   Validation accuracy, precision, recall, and F1 can also be tracked if a `compute_metrics` function is added to `run_sft.py`.
+After training or downloading a model, you can evaluate its performance on test datasets:
 
-### Evaluation Notes & Historical Context
+```bash
+# Evaluate on the test dataset
+./run_inference.sh --model models/mistral-thinking-default-epochs2 --data data/original_data/test.csv
 
-This section provides context on model performance based on evaluations run during development, including addressing initial challenges.
+# Specify which GPU to use
+./run_inference.sh --model models/mistral-thinking-default-epochs2 --data data/original_data/test.csv --gpu 1
+```
 
-**Performance after Fixing Extraction Logic:**
-
-Initial evaluations were impacted by flawed logic for extracting the final prediction from model outputs containing Chain-of-Thought reasoning. After implementing a more robust extraction method (handling multiple JSONs, avoiding simple string checks), the performance comparison on the dev set was:
-
-| Model                | Fixed Accuracy (Dev Set) | Notes                                      |
-| -------------------- | ------------------------ | ------------------------------------------ |
-| Base (Mistral-7B-v0.3) | ~53%                     | Original model without fine-tuning         |
-| Fine-tuned (Ablation 2)| ~91%                     | Significant improvement (+38% vs Base)     |
-| Checkpoint-1250      | ~82%                     | Early checkpoint showing good progress   |
-
-*(Note: Final performance is measured on the hidden test set)*
-
-**Key Historical Challenges Addressed:**
-
-1.  **Extraction Bias:** The original extraction logic incorrectly interpreted outputs containing `\"step 1:\"` as predicting label 1, artificially deflating the apparent performance of CoT-generating models.
-2.  **Multiple JSONs:** Fine-tuned models sometimes generated multiple JSON objects; the extraction logic needed refinement to correctly parse the intended one.
-3.  **Training Tokenizer Config:** An early training issue where `tokenizer.pad_token` was set to `tokenizer.eos_token` potentially hindered the model's ability to learn proper output termination and also caused generation artifacts (like repetitive padding text) that interfered with reliable JSON extraction during evaluation. This was fixed in later training runs by adding a distinct `[PAD]` token and evaluation scripts were updated for robust parsing.
-
-This context highlights the effectiveness of the fine-tuning process and the importance of robust evaluation procedures.
+For complete evaluation instructions, including how to download pre-trained models, see [EVALUATION.md](EVALUATION.md).
 
 ## Hugging Face Hub Repository
 

@@ -92,8 +92,7 @@ docker run --rm --gpus device=$GPU_ID \
   --output_file "$OUTPUT_FILE" \
   --output_csv "$OUTPUT_CSV" \
   --save_every $SAVE_EVERY \
-  --gpu_id $GPU_ID \
-  --use_cot
+  --gpu_id $GPU_ID
 
 # Check execution status
 if [ $? -ne 0 ]; then

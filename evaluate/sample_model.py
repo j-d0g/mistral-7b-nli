@@ -75,12 +75,7 @@ def parse_args():
         "--max_length", 
         type=int, 
         default=512, 
-        help="Maximum sequence length"
-    )
-    parser.add_argument(
-        "--use_cot", 
-        action="store_true", 
-        help="Use Chain-of-Thought reasoning"
+        help="Maximum sequence length (input+output)"
     )
     parser.add_argument(
         "--save_every", 
@@ -107,26 +102,19 @@ def parse_args():
     )
     return parser.parse_args()
 
-def create_nli_prompt(premise, hypothesis, use_cot=False):
-    """Create a prompt for NLI task, with or without chain-of-thought reasoning."""
-    if use_cot:
-        # Use the fine-tuning prompt from prompts.py
-        formatted_prompt = FINETUNE_PROMPT.format(
-            premise=premise,
-            hypothesis=hypothesis
-        )
-        # Wrap in Mistral's instruction format
-        prompt = f"[INST] {formatted_prompt} [/INST]"
-    else:
-        # Direct classification prompt
-        prompt = f"""[INST] You are an AI assistant trained to classify the relationship between a given premise and hypothesis. Provide your prediction as a JSON object with the key 'label' and the value as either 0 (no entailment) or 1 (entailment).
-
-Premise: '{premise}' 
-Hypothesis: {hypothesis} [/INST]"""
+def create_nli_prompt(premise, hypothesis):
+    """Create the standard NLI prompt using the fine-tuning format."""
+    # Use the fine-tuning prompt from prompts.py
+    formatted_prompt = FINETUNE_PROMPT.format(
+        premise=premise,
+        hypothesis=hypothesis
+    )
+    # Wrap in Mistral's instruction format
+    prompt = f"[INST] {formatted_prompt} [/INST]"
     return prompt
 
-def extract_prediction(output_text, use_cot=False):
-    """Extract the prediction (0 or 1) from the model's output text using improved extraction logic."""
+def extract_prediction(output_text):
+    """Extract the prediction (0 or 1) from the model's CoT output text."""
     output_text = output_text.strip()
     
     # Look for JSON objects - prioritize the one with "predicted_label"
@@ -191,7 +179,7 @@ def extract_prediction(output_text, use_cot=False):
         return 1
     
     # For CoT reasoning, try to extract from "step 3" conclusion
-    if use_cot and "step 3" in lower_text:
+    if "step 3" in lower_text:
         step3_text = lower_text.split("step 3")[1].split("step 4")[0].split("\n\n")[0]
         if "not entailed" in step3_text or "no entailment" in step3_text:
             return 0
@@ -411,7 +399,7 @@ def run_inference(model, tokenizer, test_data, args):
     for i in tqdm(range(start_idx, total_samples, args.batch_size), desc="Processing batches"):
         batch_data = test_data.iloc[i:min(i+args.batch_size, total_samples)]
         batch_prompts = [
-            create_nli_prompt(row['premise'], row['hypothesis'], args.use_cot) 
+            create_nli_prompt(row['premise'], row['hypothesis'])
             for _, row in batch_data.iterrows()
         ]
         
@@ -445,7 +433,7 @@ def run_inference(model, tokenizer, test_data, args):
                 
             # Extract the prediction
             try:
-                prediction = extract_prediction(text, args.use_cot)
+                prediction = extract_prediction(text)
                 
                 # Create result object
                 result = {
@@ -526,7 +514,6 @@ def run_inference(model, tokenizer, test_data, args):
         'model': args.model_id,
         'inference_time_seconds': elapsed_time,
         'samples_per_second': total_samples / elapsed_time if elapsed_time > 0 else 0,
-        'use_cot': args.use_cot
     }
     
     # Add the 4 core metrics if available

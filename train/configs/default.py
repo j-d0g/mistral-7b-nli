@@ -15,13 +15,13 @@ lora_alpha = 32
 lora_dropout = 0.05
 
 # Training parameters
-num_epochs = 6
+num_epochs = 2
 max_seq_length = 512
 batch_size = 16
 grad_accumulation_steps = 2
 learning_rate = 2e-4
 lr_scheduler = "cosine"
-warmup_ratio = 0.01
+warmup_ratio = 0.03
 weight_decay = 0.01
 max_grad_norm = None  # No gradient clipping
 
@@ -38,7 +38,7 @@ wandb_run_id = None
 
 # Other settings
 use_packing = False
-gradient_checkpointing = False
+gradient_checkpointing = True
 use_wandb = True
 resume_from_checkpoint = None
 gpu_id = 0 
