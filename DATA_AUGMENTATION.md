@@ -24,7 +24,7 @@ The process involves several scripts executed sequentially:
 
 2.  **Generate Reflected Thoughts (`scripts/generate_thoughts_reflected.py`)**
     *   **Input:** The JSONL file from Step 1 (e.g., `data/original_thoughts/train_thoughts.jsonl`).
-    *   **Process:** Filters for examples where the `correct` flag is `false`. Prompts a potentially stronger LLM (e.g., `open-mistral-nemo`) with the original premise, hypothesis, *true label*, and the flawed initial thought process, asking it to generate an *improved* thought process that reaches the true label.
+    *   **Process:** Filters for examples where the `correct` flag is `false`. Prompts a potentially stronger LLM (e.g., `open-mistral-nemo`) with the original premise, hypothesis, *true label*, and crucially, the *flawed initial thought process* from the first model. The prompt instructs the model to reflect on the initial error and generate an *improved* thought process that logically reaches the true label. This aims to correct the underlying reasoning flaw rather than just forcing the label.
     *   **Output:** JSON Lines file (e.g., `data/reflected_thoughts/train_reflections.jsonl`) containing only the initially incorrect examples, but now with fields like `improved_thought_process` and preserving the original `premise`, `hypothesis`, `label`.
 
 3.  **Prepare Fine-tuning Data (`scripts/prepare_ft_data.py`)**

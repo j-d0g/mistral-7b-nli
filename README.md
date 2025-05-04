@@ -198,7 +198,7 @@ This design separates infrastructure concerns (Docker, environment) from applica
 
 We use QLoRA for parameter-efficient fine-tuning.
 
-*   **Base Model:** `mistralai/Mistral-7B-v0.3`
+*   **Base Model:** `mistralai/Mistral-7B-v0.3` was selected due to its strong reasoning capabilities compared to other models in its size class, competitive performance observed in initial tests on sample NLI data, favorable inference speed and cost-effectiveness, and the availability of related models via API which supported the multi-stage CoT data generation process.
 *   **QLoRA Config:** `r=32`, `lora_alpha=64`, dropout `0.05`, target modules `["q_proj", "k_proj", "v_proj", "o_proj"]`.
 *   **Hyperparameters:** 3-5 epochs (with early stopping patience 3 based on eval loss), LR `2e-4` (linear decay, 3% warmup), AdamW optimizer (WD `0.01`), effective batch size 64, `bf16` precision.
 
@@ -250,7 +250,7 @@ Initial evaluations were impacted by flawed logic for extracting the final predi
 
 1.  **Extraction Bias:** The original extraction logic incorrectly interpreted outputs containing `\"step 1:\"` as predicting label 1, artificially deflating the apparent performance of CoT-generating models.
 2.  **Multiple JSONs:** Fine-tuned models sometimes generated multiple JSON objects; the extraction logic needed refinement to correctly parse the intended one.
-3.  **Training Tokenizer Config:** An early training issue where `tokenizer.pad_token` was set to `tokenizer.eos_token` potentially hindered the model's ability to learn proper output termination. This was fixed in later training runs by adding a distinct `[PAD]` token.
+3.  **Training Tokenizer Config:** An early training issue where `tokenizer.pad_token` was set to `tokenizer.eos_token` potentially hindered the model's ability to learn proper output termination and also caused generation artifacts (like repetitive padding text) that interfered with reliable JSON extraction during evaluation. This was fixed in later training runs by adding a distinct `[PAD]` token and evaluation scripts were updated for robust parsing.
 
 This context highlights the effectiveness of the fine-tuning process and the importance of robust evaluation procedures.
 
