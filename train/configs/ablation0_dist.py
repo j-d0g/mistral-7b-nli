@@ -6,7 +6,7 @@ Configuration for Ablation 0: Standard Training
 import sys
 import os
 current_dir = os.path.dirname(os.path.abspath(__file__))
-
+default_path = os.path.join(current_dir, 'default.py')
 # Import the default config
 sys.path.insert(0, os.path.dirname(current_dir))
 from configs.default import *
