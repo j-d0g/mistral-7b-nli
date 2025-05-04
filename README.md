@@ -134,16 +134,16 @@ We've implemented a config-based training system inspired by Karpathy's NanoGPT 
 
 ```bash
 # Run with the default configuration
-./train.sh
+./run_training.sh
 
 # Use a specific configuration
-./train.sh --config train/configs/ablation1.py
+./run_training.sh --config train/configs/ablation1.py
 
 # Use ablation2 configuration on gpu 1
-./train.sh --config train/configs/ablation2.py --gpu 1
+./run_training.sh --config train/configs/ablation2.py --gpu 1
 
 # Override specific parameters
-./train.sh --config train/configs/ablation1.py --batch_size 8 --no_wandb
+./run_training.sh --config train/configs/ablation1.py --batch_size 8 --no_wandb
 ```
 
 ### Benefits of the Configuration System:
@@ -159,7 +159,7 @@ We've implemented a config-based training system inspired by Karpathy's NanoGPT 
 
 The training system is composed of:
 
-1. **train.sh**: A minimal Docker wrapper script that passes arguments to the Python code
+1. **run_training.sh**: A minimal Docker wrapper script that passes arguments to the Python code
 2. **train/train_sft.py**: The main script that loads config and handles training
 3. **train/config_loader.py**: A utility for loading Python configuration files
 4. **train/configs/default.py**: Default configuration values for all training runs
@@ -216,7 +216,7 @@ We use QLoRA for parameter-efficient fine-tuning.
 *   A `Dockerfile` is provided to build a container image with all necessary dependencies (PyTorch, CUDA, Transformers, PEFT, TRL, bitsandbytes, wandb, etc.).
 *   Training and inference are executed within this Docker container on a remote workstation with GPUs.
     *   **Rationale**: Guarantees a consistent and reproducible environment across different systems, resolving complex dependency issues (CUDA, PyTorch versions). Simplifies setup and allows volume mounting for efficient model caching.
-*   The `train.sh` and `run_inference.sh` scripts automatically handle mounting volumes, GPU selection, and running the Python code within the container.
+*   The `run_training.sh` and `run_inference.sh` scripts automatically handle mounting volumes, GPU selection, and running the Python code within the container.
 *   `requirements.txt` lists the Python dependencies installed in the Docker image.
 
 Before running training or inference, build the Docker image:
@@ -305,7 +305,7 @@ We provide convenient scripts to download the fine-tuned Mistral-7B NLI model fr
 ├── Dockerfile
 ├── requirements.txt
 ├── prompts.py                  # Centralized prompt template definitions
-├── train.sh                    # Main wrapper script for training with configs
+├── run_training.sh                    # Main wrapper script for training with configs
 ├── train/                      # Training components
 │   ├── train_sft.py            # Main training implementation
 │   ├── config_loader.py        # Utility for loading config files
