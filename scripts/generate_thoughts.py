@@ -14,10 +14,23 @@ import logging
 import threading
 import csv
 import pathlib
+import re
+import numpy as np
 
 # --- Add project root to sys.path ---
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 # ------------------------------------
+
+# --- Import project utilities ---
+from utils.data_analysis import (
+    count_tokens,
+    get_token_bucket,
+    calculate_statistics,
+    calculate_token_bucket_stats,
+    generate_summary,
+    combine_worker_results
+)
+# -------------------------------
 
 # --- Import get_prompt function ---
 from prompts import get_prompt
@@ -113,6 +126,7 @@ def process_chunk(chunk_df, api_name, api_key, model_name, output_json, failed_c
     true_positives = 0
     false_positives = 0
     false_negatives = 0
+    token_counts = []
     
     for index, row in chunk_df.iterrows():
         logger.info(f"Worker {worker_id} - Processing ID: {row['id']} (Index: {index})...")
@@ -125,6 +139,9 @@ def process_chunk(chunk_df, api_name, api_key, model_name, output_json, failed_c
         # Update counters
         if process_result['success']:
             output_count += 1
+            if process_result.get('token_count'):
+                token_counts.append(process_result['token_count'])
+                
             if process_result['correct']:
                 correct_count += 1
                 # For true positives, both predicted and true labels must be 1
@@ -148,7 +165,8 @@ def process_chunk(chunk_df, api_name, api_key, model_name, output_json, failed_c
         'failure_count': failure_count,
         'true_positives': true_positives,
         'false_positives': false_positives,
-        'false_negatives': false_negatives
+        'false_negatives': false_negatives,
+        'token_counts': token_counts
     }
 
 def process_single_example(row, index, api_name, api_key, model_name, output_json, failed_csv_path, failed_lock, worker_id, results_dict, prompt_type='initial_generation'):
@@ -183,6 +201,9 @@ def process_single_example(row, index, api_name, api_key, model_name, output_jso
         
         # Check for valid response
         if response_json and 'predicted_label' in response_json and response_json['predicted_label'] != -1:
+            # Estimate token count for the thought process
+            token_count = count_tokens(response_json['thought_process'])
+            
             # Append the result to our shared dictionary if in parallel mode
             if results_dict is not None:
                 results_dict[str(index)] = {
@@ -190,14 +211,16 @@ def process_single_example(row, index, api_name, api_key, model_name, output_jso
                     'correct': response_json['predicted_label'] == row['true_label'],
                     'id': row['id'],
                     'predicted_label': response_json['predicted_label'],
-                    'true_label': row['true_label']
+                    'true_label': row['true_label'],
+                    'token_count': token_count
                 }
             
             return {
                 'success': True, 
                 'correct': response_json['predicted_label'] == row['true_label'],
                 'predicted_label': response_json['predicted_label'],
-                'true_label': row['true_label']
+                'true_label': row['true_label'],
+                'token_count': token_count
             }
         else:
             logger.warning(f"Worker {worker_id} - Failed to process ID: {row['id']}. Response: {response_json}")
@@ -298,6 +321,9 @@ def main():
         false_positives = 0
         false_negatives = 0
         
+        # Track token counts
+        token_counts = []
+        
         with open(args.output_json, "a") as outfile:  # Open in append mode
             for index, row in processing_df.iterrows():
                 logger.info(f"Processing ID: {row['id']} (Index: {index})...")
@@ -333,8 +359,13 @@ def main():
                     if response_json and 'predicted_label' in response_json and response_json['predicted_label'] != -1:
                         output_count += 1
                         
+                        # Calculate token count
+                        token_count = count_tokens(response_json['thought_process'])
+                        token_counts.append(token_count)
+                        
                         if response_json['predicted_label'] == row['true_label']:
                             correct_count += 1
+                            
                             # For true positives, both predicted and true labels must be 1
                             if response_json['predicted_label'] == 1 and row['true_label'] == 1:
                                 true_positives += 1
@@ -371,38 +402,48 @@ def main():
                     dummy_lock = threading.Lock()
                     write_failed_example(args.failed_csv, dummy_lock, failed_data)
         
-        # Calculate statistics
-        if output_count > 0:
-            accuracy = (correct_count / output_count) * 100
-            
-            # Calculate precision, recall, and F1
-            precision = (true_positives / (true_positives + false_positives)) * 100 if (true_positives + false_positives) > 0 else 0
-            recall = (true_positives / (true_positives + false_negatives)) * 100 if (true_positives + false_negatives) > 0 else 0
-            f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
-        else:
-            accuracy = 0
-            precision = 0
-            recall = 0
-            f1_score = 0
-            
-        # Print and save summary
-        logger.info(f"Finished processing. Successfully processed {output_count} examples with accuracy {accuracy:.2f}%")
-        logger.info(f"Precision: {precision:.2f}%, Recall: {recall:.2f}%, F1 Score: {f1_score:.2f}%")
+        # Compile results
+        results = {
+            'output_count': output_count,
+            'correct_count': correct_count,
+            'true_positives': true_positives,
+            'false_positives': false_positives,
+            'false_negatives': false_negatives
+        }
         
-        # Save summary to a file
+        # Calculate statistics
+        stats = calculate_statistics(results, token_counts)
+        
+        # Calculate token bucket statistics
+        if token_counts:
+            token_buckets = calculate_token_bucket_stats(
+                {str(i): {'token_count': tc, 'correct': i < len(token_counts) and True} for i, tc in enumerate(token_counts)},
+                token_counts,
+                stats['quartiles']
+            )
+        else:
+            token_buckets = {}
+        
+        # Generate summary
+        summary = generate_summary(
+            stats,
+            token_buckets,
+            len(processing_df),
+            0,  # No failures in single worker mode (they're immediately handled)
+            f"{args.api}/{args.model_name}",
+            args.system_prompt,
+            multi_worker=False
+        )
+        
+        # Save summary to file
         summary_file_path = f"{args.output_json}_summary.txt"
         with open(summary_file_path, "w") as summary_file:
-            summary_file.write(f"Results Summary (Single Process - {args.api}/{args.model_name}):\n")
-            summary_file.write(f"System Prompt: {args.system_prompt}\n")
-            summary_file.write(f"Total examples attempted: {len(processing_df)}\n")
-            summary_file.write(f"Total examples processed successfully: {output_count}\n")
-            summary_file.write(f"Correct predictions: {correct_count}\n")
-            summary_file.write(f"Accuracy: {accuracy:.2f}%\n")
-            summary_file.write(f"Precision: {precision:.2f}%\n")
-            summary_file.write(f"Recall: {recall:.2f}%\n")
-            summary_file.write(f"F1 Score: {f1_score:.2f}%\n")
+            summary_file.write(summary)
         
         logger.info(f"Summary saved to {summary_file_path}")
+        logger.info(f"Finished processing. Successfully processed {output_count} examples with accuracy {stats['accuracy']:.2f}%")
+        logger.info(f"Precision: {stats['precision']:.2f}%, Recall: {stats['recall']:.2f}%, F1 Score: {stats['f1_score']:.2f}%")
+        logger.info(f"Average tokens: {stats['avg_tokens']:.2f}, Min: {stats['min_tokens']}, Max: {stats['max_tokens']}")
         
     # Multi-worker mode (parallel processing)
     else:
@@ -419,6 +460,9 @@ def main():
         
         # Create chunks of data for each worker
         chunks = [processing_df.iloc[i:i+chunk_size] for i in range(0, len(processing_df), chunk_size)]
+        
+        # Track token counts
+        all_token_counts = []
         
         # Process chunks in parallel
         start_time = time.time()
@@ -443,61 +487,45 @@ def main():
                 futures.append(future)
                 
             for future in futures:
-                worker_results.append(future.result())
+                result = future.result()
+                worker_results.append(result)
+                # Collect token counts from all workers
+                if 'token_counts' in result:
+                    all_token_counts.extend(result['token_counts'])
         
-        # Write all results to the output file (ensure sorted by index for consistency)
-        sorted_indices = sorted(results_dict.keys(), key=int)
-        for index_str in sorted_indices:
-            # Ensure we have the response key before processing
-            if 'response' in results_dict[index_str]:
-                pass
-            else:
-                logger.error(f"Missing 'response' key for index {index_str} in results_dict")
+        # Collect and calculate statistics
+        combined_results = combine_worker_results(worker_results)
+        stats = calculate_statistics(combined_results, all_token_counts)
         
-        # Calculate overall statistics
-        total_output = sum(result['output_count'] for result in worker_results)
-        total_correct = sum(result['correct_count'] for result in worker_results)
-        total_failed = sum(result['failure_count'] for result in worker_results)
+        # Calculate token bucket statistics
+        token_buckets = calculate_token_bucket_stats(results_dict, all_token_counts, stats['quartiles'])
         
-        # Sum up TP, FP, FN for precision, recall, F1
-        total_tp = sum(result.get('true_positives', 0) for result in worker_results)
-        total_fp = sum(result.get('false_positives', 0) for result in worker_results)
-        total_fn = sum(result.get('false_negatives', 0) for result in worker_results)
+        # Generate summary
+        processing_time = time.time() - start_time
+        summary = generate_summary(
+            stats,
+            token_buckets,
+            len(processing_df),
+            combined_results['failure_count'],
+            f"{args.api}/{args.model_name}",
+            args.system_prompt,
+            multi_worker=True,
+            worker_results=worker_results,
+            processing_time=processing_time
+        )
         
-        accuracy = (total_correct / total_output * 100) if total_output > 0 else 0
-        
-        # Calculate precision, recall, and F1
-        precision = (total_tp / (total_tp + total_fp) * 100) if (total_tp + total_fp) > 0 else 0
-        recall = (total_tp / (total_tp + total_fn) * 100) if (total_tp + total_fn) > 0 else 0
-        f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
-        
-        # Save summary to a file
+        # Save summary to file
         summary_file_path = f"{args.output_json}_summary.txt"
         with open(summary_file_path, "w") as summary_file:
-            summary_file.write(f"Results Summary (Parallel Processing - {num_workers} workers, {args.api}/{args.model_name}):\n")
-            summary_file.write(f"System Prompt: {args.system_prompt}\n")
-            summary_file.write(f"Total examples attempted: {len(processing_df)}\n")
-            summary_file.write(f"Total examples processed successfully: {total_output}\n")
-            summary_file.write(f"Total examples failed: {total_failed}\n")
-            summary_file.write(f"Correct predictions (on successful): {total_correct}\n")
-            summary_file.write(f"Accuracy (on successful): {accuracy:.2f}%\n")
-            summary_file.write(f"Precision: {precision:.2f}%\n")
-            summary_file.write(f"Recall: {recall:.2f}%\n")
-            summary_file.write(f"F1 Score: {f1_score:.2f}%\n")
-            summary_file.write(f"Processing time: {time.time() - start_time:.2f} seconds\n")
-            
-            # Add per-worker statistics
-            summary_file.write("\nPer-worker statistics:\n")
-            for result in worker_results:
-                worker_accuracy = (result['correct_count'] / result['output_count'] * 100) if result['output_count'] > 0 else 0
-                summary_file.write(f"Worker {result['worker_id']}: {result['output_count']} successful, {result['failure_count']} failed, {result['correct_count']} correct ({worker_accuracy:.2f}% accuracy)\n")
+            summary_file.write(summary)
         
         logger.info(f"Finished processing. Results saved to {args.output_json}")
-        logger.info(f"Failed examples saved to {args.failed_csv} ({total_failed} failures)")
+        logger.info(f"Failed examples saved to {args.failed_csv} ({combined_results['failure_count']} failures)")
         logger.info(f"Summary saved to {summary_file_path}")
-        logger.info(f"Processed {total_output} examples successfully with accuracy {accuracy:.2f}%")
-        logger.info(f"Precision: {precision:.2f}%, Recall: {recall:.2f}%, F1 Score: {f1_score:.2f}%")
-        logger.info(f"Total processing time: {time.time() - start_time:.2f} seconds")
+        logger.info(f"Processed {combined_results['output_count']} examples successfully with accuracy {stats['accuracy']:.2f}%")
+        logger.info(f"Precision: {stats['precision']:.2f}%, Recall: {stats['recall']:.2f}%, F1 Score: {stats['f1_score']:.2f}%")
+        logger.info(f"Average tokens: {stats['avg_tokens']:.2f}, Min: {stats['min_tokens']}, Max: {stats['max_tokens']}")
+        logger.info(f"Total processing time: {processing_time:.2f} seconds")
 
 if __name__ == "__main__":
     main()
