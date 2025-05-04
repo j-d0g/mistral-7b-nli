@@ -13,7 +13,7 @@ from configs.default import *
 
 # Model and data paths
 output_dir = "models/mistral-thinking-default-final"
-data_dir = "data/finetune/train_ft_final.jsonl" # Train on final dataset that merges train and test set we allocated.
+train_data = "data/finetune/train_ft_final.jsonl" # Train on final dataset that merges train and test set we allocated.
 
 num_epochs = 5
 
