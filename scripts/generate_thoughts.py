@@ -109,6 +109,10 @@ def process_chunk(chunk_df, api_name, api_key, model_name, output_json, failed_c
     output_count = 0
     correct_count = 0
     failure_count = 0
+    # Add tracking for TP, FP, FN for precision, recall, and F1
+    true_positives = 0
+    false_positives = 0
+    false_negatives = 0
     
     for index, row in chunk_df.iterrows():
         logger.info(f"Worker {worker_id} - Processing ID: {row['id']} (Index: {index})...")
@@ -123,6 +127,16 @@ def process_chunk(chunk_df, api_name, api_key, model_name, output_json, failed_c
             output_count += 1
             if process_result['correct']:
                 correct_count += 1
+                # For true positives, both predicted and true labels must be 1
+                if process_result.get('predicted_label', 0) == 1 and process_result.get('true_label', 0) == 1:
+                    true_positives += 1
+            else:
+                # For false positives, predicted is 1 but true is 0
+                if process_result.get('predicted_label', 0) == 1 and process_result.get('true_label', 0) == 0:
+                    false_positives += 1
+                # For false negatives, predicted is 0 but true is 1
+                elif process_result.get('predicted_label', 0) == 0 and process_result.get('true_label', 0) == 1:
+                    false_negatives += 1
         else:
             failure_count += 1
     
@@ -131,7 +145,10 @@ def process_chunk(chunk_df, api_name, api_key, model_name, output_json, failed_c
         'worker_id': worker_id,
         'output_count': output_count,
         'correct_count': correct_count,
-        'failure_count': failure_count
+        'failure_count': failure_count,
+        'true_positives': true_positives,
+        'false_positives': false_positives,
+        'false_negatives': false_negatives
     }
 
 def process_single_example(row, index, api_name, api_key, model_name, output_json, failed_csv_path, failed_lock, worker_id, results_dict, prompt_type='initial_generation'):
@@ -171,12 +188,16 @@ def process_single_example(row, index, api_name, api_key, model_name, output_jso
                 results_dict[str(index)] = {
                     'response': response_json,
                     'correct': response_json['predicted_label'] == row['true_label'],
-                    'id': row['id']
+                    'id': row['id'],
+                    'predicted_label': response_json['predicted_label'],
+                    'true_label': row['true_label']
                 }
             
             return {
                 'success': True, 
-                'correct': response_json['predicted_label'] == row['true_label']
+                'correct': response_json['predicted_label'] == row['true_label'],
+                'predicted_label': response_json['predicted_label'],
+                'true_label': row['true_label']
             }
         else:
             logger.warning(f"Worker {worker_id} - Failed to process ID: {row['id']}. Response: {response_json}")
@@ -272,6 +293,11 @@ def main():
         # Process examples sequentially
         output_count = 0
         correct_count = 0
+        # Add tracking for precision, recall, F1
+        true_positives = 0
+        false_positives = 0
+        false_negatives = 0
+        
         with open(args.output_json, "a") as outfile:  # Open in append mode
             for index, row in processing_df.iterrows():
                 logger.info(f"Processing ID: {row['id']} (Index: {index})...")
@@ -306,8 +332,19 @@ def main():
                     # Check for valid response and write to output file
                     if response_json and 'predicted_label' in response_json and response_json['predicted_label'] != -1:
                         output_count += 1
+                        
                         if response_json['predicted_label'] == row['true_label']:
                             correct_count += 1
+                            # For true positives, both predicted and true labels must be 1
+                            if response_json['predicted_label'] == 1 and row['true_label'] == 1:
+                                true_positives += 1
+                        else:
+                            # For false positives, predicted is 1 but true is 0
+                            if response_json['predicted_label'] == 1 and row['true_label'] == 0:
+                                false_positives += 1
+                            # For false negatives, predicted is 0 but true is 1
+                            elif response_json['predicted_label'] == 0 and row['true_label'] == 1:
+                                false_negatives += 1
                     else:
                         logger.warning(f"Failed to process ID: {row['id']}. Response: {response_json}")
                         failed_data = {
@@ -337,11 +374,20 @@ def main():
         # Calculate statistics
         if output_count > 0:
             accuracy = (correct_count / output_count) * 100
+            
+            # Calculate precision, recall, and F1
+            precision = (true_positives / (true_positives + false_positives)) * 100 if (true_positives + false_positives) > 0 else 0
+            recall = (true_positives / (true_positives + false_negatives)) * 100 if (true_positives + false_negatives) > 0 else 0
+            f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
         else:
             accuracy = 0
+            precision = 0
+            recall = 0
+            f1_score = 0
             
         # Print and save summary
         logger.info(f"Finished processing. Successfully processed {output_count} examples with accuracy {accuracy:.2f}%")
+        logger.info(f"Precision: {precision:.2f}%, Recall: {recall:.2f}%, F1 Score: {f1_score:.2f}%")
         
         # Save summary to a file
         summary_file_path = f"{args.output_json}_summary.txt"
@@ -352,6 +398,9 @@ def main():
             summary_file.write(f"Total examples processed successfully: {output_count}\n")
             summary_file.write(f"Correct predictions: {correct_count}\n")
             summary_file.write(f"Accuracy: {accuracy:.2f}%\n")
+            summary_file.write(f"Precision: {precision:.2f}%\n")
+            summary_file.write(f"Recall: {recall:.2f}%\n")
+            summary_file.write(f"F1 Score: {f1_score:.2f}%\n")
         
         logger.info(f"Summary saved to {summary_file_path}")
         
@@ -409,7 +458,18 @@ def main():
         total_output = sum(result['output_count'] for result in worker_results)
         total_correct = sum(result['correct_count'] for result in worker_results)
         total_failed = sum(result['failure_count'] for result in worker_results)
+        
+        # Sum up TP, FP, FN for precision, recall, F1
+        total_tp = sum(result.get('true_positives', 0) for result in worker_results)
+        total_fp = sum(result.get('false_positives', 0) for result in worker_results)
+        total_fn = sum(result.get('false_negatives', 0) for result in worker_results)
+        
         accuracy = (total_correct / total_output * 100) if total_output > 0 else 0
+        
+        # Calculate precision, recall, and F1
+        precision = (total_tp / (total_tp + total_fp) * 100) if (total_tp + total_fp) > 0 else 0
+        recall = (total_tp / (total_tp + total_fn) * 100) if (total_tp + total_fn) > 0 else 0
+        f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
         
         # Save summary to a file
         summary_file_path = f"{args.output_json}_summary.txt"
@@ -421,6 +481,9 @@ def main():
             summary_file.write(f"Total examples failed: {total_failed}\n")
             summary_file.write(f"Correct predictions (on successful): {total_correct}\n")
             summary_file.write(f"Accuracy (on successful): {accuracy:.2f}%\n")
+            summary_file.write(f"Precision: {precision:.2f}%\n")
+            summary_file.write(f"Recall: {recall:.2f}%\n")
+            summary_file.write(f"F1 Score: {f1_score:.2f}%\n")
             summary_file.write(f"Processing time: {time.time() - start_time:.2f} seconds\n")
             
             # Add per-worker statistics
@@ -433,6 +496,7 @@ def main():
         logger.info(f"Failed examples saved to {args.failed_csv} ({total_failed} failures)")
         logger.info(f"Summary saved to {summary_file_path}")
         logger.info(f"Processed {total_output} examples successfully with accuracy {accuracy:.2f}%")
+        logger.info(f"Precision: {precision:.2f}%, Recall: {recall:.2f}%, F1 Score: {f1_score:.2f}%")
         logger.info(f"Total processing time: {time.time() - start_time:.2f} seconds")
 
 if __name__ == "__main__":
