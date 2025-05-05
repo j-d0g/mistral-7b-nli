@@ -1,9 +1,15 @@
 #!/bin/bash
 
 # Wrapper to run Mistral-7B NLI fine-tuning inside Docker
-# Passes all arguments directly to the Python training script
+# Handles GPU selection, Docker setup, and passes arguments to train/train_sft.py
+
+# Ensure Hugging Face cache directory exists
+HF_CACHE_DIR="hf_cache"
+mkdir -p "${HF_CACHE_DIR}"
+echo "Using local cache directory: ${HF_CACHE_DIR}"
 
 # Parse GPU options
+# Default: Use GPU 0 if no options are provided
 USE_ALL_GPUS=false
 GPU_IDS="0"
 
@@ -29,27 +35,29 @@ if [ "$USE_ALL_GPUS" = true ]; then
   docker run --rm \
     --gpus all \
     -v "$(pwd):/app" \
-    -v "$(pwd)/hf_cache:/root/.cache/huggingface" \
+    -v "$(pwd)/${HF_CACHE_DIR}:/root/.cache/huggingface" \
     --env-file .env \
     mistral-nli-ft \
     torchrun --nproc_per_node=$(nvidia-smi --list-gpus | wc -l) train/train_sft.py --distributed_training True "$@"
 elif [[ "$GPU_IDS" == *","* ]]; then
   # Multiple specific GPUs with distributed training
-  echo "Using GPUs: $GPU_IDS"
+  echo "Using GPUs: $GPU_IDS for distributed training"
+  NUM_GPUS=$(echo $GPU_IDS | tr ',' '\n' | wc -l)
   docker run --rm \
-    --gpus "device=$GPU_IDS" \
+    --gpus all \
+    -e CUDA_VISIBLE_DEVICES=$GPU_IDS \
     -v "$(pwd):/app" \
-    -v "$(pwd)/hf_cache:/root/.cache/huggingface" \
+    -v "$(pwd)/${HF_CACHE_DIR}:/root/.cache/huggingface" \
     --env-file .env \
     mistral-nli-ft \
-    torchrun --nproc_per_node=$(echo $GPU_IDS | tr ',' '\n' | wc -l) train/train_sft.py --distributed_training True "$@"
+    torchrun --nproc_per_node=$NUM_GPUS train/train_sft.py --distributed_training True "$@"
 else
-  # Single GPU, no distributed training
-  echo "Using GPU: $GPU_IDS"
+  # Single GPU (defaulting to GPU 0 if no --gpus specified), no distributed training
+  echo "Using single GPU: $GPU_IDS"
   docker run --rm \
     --gpus "device=$GPU_IDS" \
     -v "$(pwd):/app" \
-    -v "$(pwd)/hf_cache:/root/.cache/huggingface" \
+    -v "$(pwd)/${HF_CACHE_DIR}:/root/.cache/huggingface" \
     --env-file .env \
     mistral-nli-ft \
     python3 train/train_sft.py "$@"

@@ -135,5 +135,5 @@ print(f"""
 🎉 Success! Model files downloaded to: {LOCAL_MODEL_DIR}
 
 To run inference:
-./run_inference.sh --model models/Mistral_Thinking_Abl2/checkpoint-2000 --data data/sample/demo.csv
+./run_inference.sh --model models/mistral-thinking-default-epochs2 --data data/sample/demo.csv
 """) 

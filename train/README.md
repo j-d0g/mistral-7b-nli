@@ -12,6 +12,15 @@ This directory contains the Python code and configuration files for fine-tuning 
     *   `minimal_test.py`: A minimal config for quick testing.
     *   `distributed.py`: Example config for multi-GPU setup (check compatibility/implementation details).
 
+## Dataset and Data Pipeline
+
+This training system expects fine-tuning data in JSONL format as specified in the configuration files (see `configs/default.py`). The default paths are:
+
+- `data/finetune/train_ft.jsonl` - Training data
+- `data/finetune/dev_ft.jsonl` - Validation data
+
+For details on the dataset structure, data generation pipeline, and how to download pre-generated datasets, please refer to the [Data README](../data/README.md).
+
 ## How to Run Training
 
 Training is **always** initiated via the `run_training.sh` script in the project root directory. This script handles Docker setup and passes arguments to `train_sft.py`.

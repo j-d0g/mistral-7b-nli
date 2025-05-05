@@ -67,7 +67,7 @@ The selection of `mistralai/Mistral-7B-v0.3` wasn't arbitrary. Several factors m
 ### Training Script Cleanup
 
 *   `run_training.sh` is the current, correct script for launching training.
-*   `train.sh` is outdated and should be ignored/removed.
+*   References to `train.sh` in documentation have been updated - this script was removed to avoid confusion.
 
 ### Data Source
 
