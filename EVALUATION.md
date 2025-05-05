@@ -14,11 +14,11 @@ This document provides instructions for evaluating NLI models on test datasets, 
 ## Quick Start
 
 ```bash
-# Evaluate a model you trained
-./run_inference.sh --model models/mistral-thinking-sample-test --data data/original_data/test.csv
+# Evaluate a model you trained (on unlabeled data - for predictions only)
+./run_inference.sh --model models/mistral-thinking-sample-test --data data/sample/demo.csv
 
-# Evaluate a downloaded model
-./run_inference.sh --model models/mistral-thinking-default-epochs2 --data data/original_data/test.csv
+# Evaluate a downloaded model (on labeled data - for accuracy metrics)
+./run_inference.sh --model models/mistral-thinking-default-epochs2 --data data/original_data/sample.csv
 ```
 
 ## Evaluation Workflow
@@ -29,6 +29,14 @@ The evaluation process follows these steps:
 2. **Select a test dataset**: A CSV file containing premise-hypothesis pairs (with or without ground truth labels)
 3. **Run inference**: Execute the evaluation script to generate predictions and measure performance
 4. **Analyze results**: Review the output files in the `results/` directory
+
+> **Important**: The script automatically detects whether your input CSV has a `label` column:
+> - **With labels**: The script will calculate and report accuracy metrics
+> - **Without labels**: The script will only generate predictions
+
+### Example Dataset Types:
+- `data/original_data/sample.csv`: Contains labeled data (includes a `label` column)
+- `data/sample/demo.csv`: Contains unlabeled data (no `label` column)
 
 ## Option 1: Evaluating Your Own Trained Models
 
@@ -88,14 +96,24 @@ After downloading, evaluate the model using:
 
 The evaluation script generates two output files in the `results/` directory:
 
-1. **JSON file**: Contains detailed information including:
-   - Overall accuracy (if labels were in the test data)
-   - Inference time and throughput statistics
-   - Per-example results with premise, hypothesis, true label, predicted label, and thought process
+1. **JSON file** (`results/[model_name]-[dataset_name]-[timestamp].json`): 
+   - **Contains**: 
+     - Model configuration
+     - Overall accuracy, precision, recall, and F1 score (if input data had labels)
+     - Inference time and throughput statistics
+     - Per-example results with premise, hypothesis, true label (if available), predicted label, and thought process
+   - **Purpose**: Provides detailed information for analysis and debugging
 
-2. **CSV file**: A simplified version with premise, hypothesis, true label, and predicted label columns
+2. **CSV file** (`results/[model_name]-[dataset_name]-[timestamp].csv`):
+   - **Contains**:
+     - Premise and hypothesis
+     - True label (if available in input data)
+     - Predicted label
+   - **Purpose**: Simplified format for quick review or importing into other tools
 
-Example output filename pattern: `results/[model_name]-[dataset_name]-[timestamp].json`
+### Checkpoint Files
+
+The script also saves checkpoint files during processing (`results/checkpoint_[model_name]-[dataset_name]-[timestamp].json`), which can be useful for debugging or recovering from interruptions.
 
 ## Advanced Options
 
