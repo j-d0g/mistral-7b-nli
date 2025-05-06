@@ -78,6 +78,7 @@ The data preparation involved a three-stage process:
 
 <div align="center">
   <img src="metrics/training_dynamics.png" alt="Training Dynamics" width="700"/>
+  <p><em>Training dynamics for different model configurations, showing validation loss and accuracy during fine-tuning. Note how Ablation2, with its lower learning rate and larger batch size, demonstrates more stable convergence.</em></p>
 </div>
 
 ## Configuration Differences
