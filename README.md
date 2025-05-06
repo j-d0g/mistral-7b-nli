@@ -111,9 +111,9 @@ python3 scripts/generate_thoughts.py --api mistral --input-csv data/original_dat
 ├── HUB_DATASET.md               # Dataset card documentation
 ├── PAPER.md                     # Research findings and methodology
 ├── prompts.py                   # Centralized prompt templates
-├── run_training.sh              # Training wrapper script
-├── run_inference.sh             # Inference wrapper script
-├── run_metrics.sh               # Metrics generation script
+├── run_training.sh              # Script for running training
+├── run_inference.sh             # Script for running inference
+├── run_metrics.sh               # Script for parsing metrics from results
 ├── data/                        # Dataset files and scripts
 │   ├── original_data/           # Original NLI datasets (CSV)
 │   ├── original_thoughts/       # Generated thought processes
