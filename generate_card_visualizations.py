@@ -476,50 +476,65 @@ def create_model_performance_visualization(metrics):
     
     return output_path
 
-def create_token_vs_accuracy_visualization():
-    """Create visualization showing relationship between token length and accuracy."""
-    # Create placeholder visualization for token length vs accuracy
-    fig, ax = plt.subplots(figsize=(10, 6), dpi=200)
-    fig.patch.set_facecolor(BACKGROUND_COLOR)
-    
-    # Create sample data for illustration
-    token_ranges = ['0-100', '101-200', '201-300', '301+']
-    accuracies = [92.5, 94.8, 89.3, 82.1]
-    counts = [120, 380, 270, 80]  # Example counts for each range
-    
-    # Normalize counts for plotting
-    max_count = max(counts)
-    normalized_counts = [count/max_count * 50 for count in counts]
-    
-    # Plot scatter points with size representing count - using more distinct colors
-    for i, (token_range, accuracy, count, norm_count) in enumerate(zip(token_ranges, accuracies, counts, normalized_counts)):
-        ax.scatter(i, accuracy, s=norm_count*20, alpha=0.7, color=MISTRAL_COLORS[i % len(MISTRAL_COLORS)], 
-                  edgecolor='black', linewidth=1)
+def create_token_vs_accuracy_visualization(metrics=None):
+    """Create visualization showing relationship between token length and accuracy from real data."""
+    # Check if we have token_vs_accuracy data in metrics
+    if metrics and "token_vs_accuracy" in metrics and metrics["token_vs_accuracy"]:
+        # Use real data from metrics
+        token_data = metrics["token_vs_accuracy"]
+        token_ranges = token_data.get("ranges", ['0-100', '101-200', '201-300', '301+'])
+        accuracies = token_data.get("accuracies", [0, 0, 0, 0])
+        counts = token_data.get("counts", [0, 0, 0, 0])
         
-        # Add count labels
-        ax.text(i, accuracy+3, f'{count} examples', ha='center', va='center', fontsize=10)
-    
-    # Connect points with line
-    ax.plot(range(len(token_ranges)), accuracies, color='gray', linestyle='--', alpha=0.5)
-    
-    # Add annotations
-    for i, (token_range, accuracy) in enumerate(zip(token_ranges, accuracies)):
-        ax.text(i, accuracy-4, f'{accuracy:.1f}%', ha='center', va='center', fontsize=12, fontweight='bold')
-    
-    # Customize chart
-    ax.set_title('Reasoning Chain Length vs. Accuracy (Ablation2_Best Model)', fontsize=16, pad=15)
-    ax.set_xlabel('Token Range in Reasoning Chain', fontsize=12, labelpad=10)
-    ax.set_ylabel('Accuracy (%)', fontsize=12)
-    ax.set_xticks(range(len(token_ranges)))
-    ax.set_xticklabels(token_ranges)
-    ax.set_ylim(75, 100)
-    
-    # Add caption indicating this is placeholder data
-    ax.text(0.5, 0.01, "Placeholder visualization - Replace with actual token vs accuracy data",
-           ha='center', va='bottom', fontsize=10, style='italic', transform=ax.transAxes)
-    
-    # Add grid
-    ax.grid(alpha=0.3)
+        # Create figure
+        fig, ax = plt.subplots(figsize=(10, 6), dpi=200)
+        fig.patch.set_facecolor(BACKGROUND_COLOR)
+        
+        # Normalize counts for plotting
+        max_count = max(counts) if counts and max(counts) > 0 else 1
+        normalized_counts = [count/max_count * 50 for count in counts]
+        
+        # Plot scatter points with size representing count
+        for i, (token_range, accuracy, count, norm_count) in enumerate(zip(token_ranges, accuracies, counts, normalized_counts)):
+            ax.scatter(i, accuracy, s=norm_count*20, alpha=0.7, color=MISTRAL_COLORS[i % len(MISTRAL_COLORS)], 
+                      edgecolor='black', linewidth=1)
+            
+            # Add count labels
+            ax.text(i, accuracy+3, f'{count} examples', ha='center', va='center', fontsize=10)
+        
+        # Connect points with line
+        ax.plot(range(len(token_ranges)), accuracies, color='gray', linestyle='--', alpha=0.5)
+        
+        # Add annotations
+        for i, (token_range, accuracy) in enumerate(zip(token_ranges, accuracies)):
+            ax.text(i, accuracy-4, f'{accuracy:.1f}%', ha='center', va='center', fontsize=12, fontweight='bold')
+        
+        # Get model name from metrics if available
+        model_name = "Fine-tuned Model"
+        if "model" in metrics and metrics["model"]:
+            model_name = metrics["model"].split("/")[-1]
+        
+        # Customize chart
+        ax.set_title(f'Reasoning Chain Length vs. Accuracy ({model_name})', fontsize=16, pad=15)
+        ax.set_xlabel('Token Range in Reasoning Chain', fontsize=12, labelpad=10)
+        ax.set_ylabel('Accuracy (%)', fontsize=12)
+        ax.set_xticks(range(len(token_ranges)))
+        ax.set_xticklabels(token_ranges)
+        ax.set_ylim(50, 100)  # Set y-axis limit to focus on the relevant range
+        
+        # Add grid
+        ax.grid(alpha=0.3)
+    else:
+        # Create placeholder visualization with a message that no data is available
+        fig, ax = plt.subplots(figsize=(10, 6), dpi=200)
+        fig.patch.set_facecolor(BACKGROUND_COLOR)
+        
+        ax.text(0.5, 0.5, "No token vs accuracy data available.\nRun analyze_token_accuracy.py to generate this data.",
+               ha='center', va='center', fontsize=14, fontweight='bold', transform=ax.transAxes)
+        
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.axis('off')
     
     # Final adjustments
     plt.tight_layout()
@@ -799,7 +814,7 @@ def main():
     visualizations["model_performance"] = create_model_performance_visualization(metrics)
     
     print("Creating token vs accuracy visualization...")
-    visualizations["token_vs_accuracy"] = create_token_vs_accuracy_visualization()
+    visualizations["token_vs_accuracy"] = create_token_vs_accuracy_visualization(metrics)
     
     print("Creating model architecture visualization...")
     visualizations["model_architecture"] = create_model_architecture_visualization()
