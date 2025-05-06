@@ -1,0 +1,57 @@
+{
+  "dataset": {
+    "train_examples": 37571,
+    "dev_examples": 1977,
+    "test_examples": 1974,
+    "total_examples": 41522,
+    "train_percentage": 90.48,
+    "dev_percentage": 4.76,
+    "test_percentage": 4.75,
+    "label_distribution": {
+      "entailment": 21429,
+      "no_entailment": 20093,
+      "entailment_percentage": 51.61,
+      "no_entailment_percentage": 48.39
+    }
+  },
+  "tokens": {
+    "premise": {
+      "avg": 26.87,
+      "min": 0,
+      "max": 340,
+      "quartiles": [
+        14.0,
+        23.0,
+        36.0
+      ]
+    },
+    "hypothesis": {
+      "avg": 14.51,
+      "min": 0,
+      "max": 71,
+      "quartiles": [
+        9.0,
+        13.0,
+        18.0
+      ]
+    },
+    "thought_process": {
+      "avg": 164.54,
+      "min": 4,
+      "max": 921,
+      "quartiles": [
+        125.0,
+        153.0,
+        191.0
+      ]
+    }
+  },
+  "models": {
+    "mistral-7b-nli": {
+      "accuracy": 95.2,
+      "precision": 94.8,
+      "recall": 93.5,
+      "f1_score": 94.1
+    }
+  }
+}

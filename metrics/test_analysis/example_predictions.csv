@@ -1,0 +1,13 @@
+Type,Premise,Hypothesis,True Label,Predicted Label
+Correct Entailment,Two Seattle firefighters standing in front of their truck.,the firefighters are standing,1,1
+Correct Entailment,"The phrase is generally not used in Europe, as some find it artificial offensive.","The phrase is generally not used in Europe, as some find it artificial or even offensive.",1,1
+Correct Entailment,"During the June Annual Conference for Chief Justices and State Court Administrators, LSC conducted two sessions on effective self-help programs and had informal meetings with judges and administrators to explore existing and potential pro se partnerships between civil court systems and legal aid services.",LSC effectively held discussions and networked with legal community members at both this year's and last year's conferences.,1,1
+Correct Contradiction,The blow had been a good one.,The blow had been a pathetic one.,0,0
+Correct Contradiction,"Get in, he ordered.",He asked them to get out,0,0
+Correct Contradiction,"Screaming headlines in every paper in the country ”damn all journalists, I say! ",I gobbled up all the newspapers I could get my hands on. ,0,0
+Incorrect Entailment,"'A slight sprain,'  ",It would take weeks to heal the sprain.  ,1,0
+Incorrect Entailment,We also cannot stand their dog.,Their dog is a Labrador.,1,0
+Incorrect Entailment,"When I use a word, Humpty Dumpty said in rather a scornful tone, it means just what I choose it to mean--neither more nor less.",Humpty Dumpty was yelling at his friends.,1,0
+Incorrect Contradiction,"In the center is the most ancient monument in Paris, the 23-m- (75-ft-) tall pink-granite Obelisk of Luxor from the temple of Ramses II, dating back to 1300 b.c.","For nearly three thousands years, the Obelisk of Luxor has stood at its original site in Paris.",0,1
+Incorrect Contradiction,Pays Basque,Spanish Basque country. ,0,1
+Incorrect Contradiction,right well i you know i'm like i said i'm i'm very much pro testing um and and this is why,I am not protesting.,0,1
