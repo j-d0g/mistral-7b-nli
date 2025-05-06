@@ -123,6 +123,18 @@ Our fine-tuned model demonstrates excellent reasoning capabilities across variou
   <img src="metrics/original_token_vs_accuracy.png" alt="Mistral-7B-Instruct Token Length vs Accuracy" width="700"/>
 </div>
 
+**Comprehensive performance comparison:**
+
+| Metric | Base Mistral-7B | Mistral-7B-Instruct* | Fine-tuned Model | Relative Improvement** |
+|--------|----------------|-------------------|------------------|----------------------|
+| Accuracy | 53.77% | 76.0% | 89.58% | +66.60% |
+| Precision | 60.49% | 89.7% | 89.57% | +48.07% |
+| Recall | 52.32% | 57.2% | 89.58% | +71.21% |
+| F1 Score | 41.51% | 69.8% | 89.57% | +115.78% |
+
+*Mistral-7B-Instruct with extensive prompt engineering and single-shot examples  
+**Relative improvement calculated against the Base Mistral-7B model
+
 **Comparative analysis across token ranges:**
 
 | Token Range | Mistral-7B-Instruct Accuracy | Fine-tuned Model Accuracy | Improvement |
