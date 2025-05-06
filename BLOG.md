@@ -278,4 +278,4 @@ We implemented a Python-based configuration system inspired by NanoGPT:
 |  | Poster presentation | Engaging and concise explanation. | 2 | Presentation skill. |
 |  | Q&A (Solution C) | Satisfactory answers to questions. | 2 | Depends on understanding documented here. |
 
-*(Note: Marks related to a second solution, Q&A for it, etc., are omitted for clarity as they are not covered by this specific project focus.)* 
+*(Note: Marks related to a second solution, Q&A for it, etc., are omitted for clarity as they are not covered by this specific project focus.)*

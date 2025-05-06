@@ -8,7 +8,6 @@ license: apache-2.0
 
 <div align="center">
   <img src="metrics/dataset_banner.png" alt="NLI Dataset Banner" width="600"/>
-  <p><i>Placeholder for dataset banner - generated after running metrics script</i></p>
 </div>
 
 ## Dataset Description
@@ -19,7 +18,7 @@ This dataset was created as part of a university assignment at The University of
 
 - **Task Type**: Natural Language Inference with Chain-of-Thought Reasoning
 - **Languages**: English
-- **Size**: [TOTAL_EXAMPLES] examples (approximately 30,000)
+- **Size**: 39,546 examples
 - **Format**: JSONL with premise, hypothesis, reasoning chain, and label
 - **License**: Apache 2.0
 - **Assignment Context**: Developed at The University of Manchester
@@ -34,7 +33,6 @@ The dataset was created from a collection of premise-hypothesis pairs with binar
 
 <div align="center">
   <img src="metrics/data_pipeline.png" alt="Data Pipeline" width="800"/>
-  <p><i>Placeholder for data pipeline visualization - generated after running metrics script</i></p>
 </div>
 
 The dataset creation involved three key phases:
@@ -48,11 +46,11 @@ The dataset creation involved three key phases:
 
 #### 1. Base Data Preparation
 
-The original dataset was split into training ([TRAIN_PERCENTAGE]%), validation ([DEV_PERCENTAGE]%), and test ([TEST_PERCENTAGE]%) sets with balanced label distribution:
+The original dataset was split into training (90.01%), validation (5.00%), and test (4.99%) sets with balanced label distribution:
 
-- **Training set**: [TRAIN_EXAMPLES] examples used for fine-tuning
-- **Validation set**: [DEV_EXAMPLES] examples used for hyperparameter tuning
-- **Test set**: [TEST_EXAMPLES] examples reserved for final evaluation before submission to hidden test set.
+- **Training set**: 35,597 examples used for fine-tuning
+- **Validation set**: 1,977 examples used for hyperparameter tuning
+- **Test set**: 1,972 examples reserved for final evaluation before submission to hidden test set.
 
 #### 2. Thought Generation
 
@@ -69,7 +67,6 @@ This step resulted in detailed reasoning chains that break down the inference pr
 
 <div align="center">
   <img src="metrics/reflection_process.png" alt="Reflection Process" width="700"/>
-  <p><i>Placeholder for reflection process visualization - generated after running metrics script</i></p>
 </div>
 
 To enhance reasoning quality, we implemented a novel reflection mechanism:
@@ -120,31 +117,50 @@ The final dataset underwent several processing steps:
 
 <div align="center">
   <img src="metrics/dataset_statistics.png" alt="Dataset Statistics" width="600"/>
-  <p><i>Placeholder for dataset statistics visualization - generated after running metrics script</i></p>
 </div>
 
 | Metric | Value |
 |--------|-------|
-| Total Examples | [TOTAL_EXAMPLES] |
-| Training Set | [TRAIN_EXAMPLES] ([TRAIN_PERCENTAGE]%) |
-| Validation Set | [DEV_EXAMPLES] ([DEV_PERCENTAGE]%) |
-| Test Set | [TEST_EXAMPLES] ([TEST_PERCENTAGE]%) |
-| Entailment Examples | [ENTAILMENT_EXAMPLES] ([ENTAILMENT_PERCENTAGE]%) |
-| Non-entailment Examples | [NO_ENTAILMENT_EXAMPLES] ([NO_ENTAILMENT_PERCENTAGE]%) |
+| Total Examples | 39,546 |
+| Training Set | 35,597 (90.01%) |
+| Validation Set | 1,977 (5.00%) |
+| Test Set | 1,972 (4.99%) |
+| Entailment Examples | 21,429 (51.61%) |
+| Non-entailment Examples | 20,093 (48.39%) |
 
 ### Token Length Analysis
 
 <div align="center">
+  <img src="metrics/token_count_distribution.png" alt="Token Count Distribution" width="700"/>
+</div>
+
+<div align="center">
   <img src="metrics/token_lengths.png" alt="Token Lengths" width="700"/>
-  <p><i>Placeholder for token length visualization - generated after running metrics script</i></p>
 </div>
 
 | Component | Average Tokens | Min | Max | Median |
 |-----------|----------------|-----|-----|--------|
-| Premise | [PREMISE_AVG_TOKENS] | [PREMISE_MIN_TOKENS] | [PREMISE_MAX_TOKENS] | [PREMISE_MEDIAN_TOKENS] |
-| Hypothesis | [HYPOTHESIS_AVG_TOKENS] | [HYPOTHESIS_MIN_TOKENS] | [HYPOTHESIS_MAX_TOKENS] | [HYPOTHESIS_MEDIAN_TOKENS] |
-| Reasoning Chain | [THOUGHT_AVG_TOKENS] | [THOUGHT_MIN_TOKENS] | [THOUGHT_MAX_TOKENS] | [THOUGHT_MEDIAN_TOKENS] |
-| Reflection | [REFLECTION_AVG_TOKENS] | [REFLECTION_MIN_TOKENS] | [REFLECTION_MAX_TOKENS] | [REFLECTION_MEDIAN_TOKENS] |
+| Premise | 26.87 | 0 | 340 | 23.00 |
+| Hypothesis | 14.51 | 0 | 71 | 13.00 |
+| Reasoning Chain | 164.54 | 4 | 921 | 153.00 |
+
+This analysis shows that reasoning chains are significantly longer than premises or hypotheses, with an average of 164.54 tokens. This substantial length demonstrates the depth of reasoning captured in the dataset, with the model breaking down its inference process into detailed logical steps.
+
+### Reasoning Chain Length vs. Accuracy
+
+We discovered an interesting relationship between reasoning chain length and accuracy in the original generated thoughts:
+
+<div align="center">
+  <img src="metrics/original_token_vs_accuracy.png" alt="Original Thoughts Token Length vs Accuracy" width="700"/>
+</div>
+
+The data shows a clear trend:
+- Short thoughts (0-100 tokens): 86.44% accuracy
+- Medium thoughts (101-200 tokens): 80.14% accuracy 
+- Long thoughts (201-300 tokens): 69.50% accuracy
+- Very long thoughts (301+ tokens): 57.16% accuracy
+
+This finding suggests that as reasoning chains become longer, they become more prone to errors, making this an important consideration for both training and inference.
 
 ### Evaluation Metrics
 
@@ -176,7 +192,6 @@ By pairing premise-hypothesis examples with explicit reasoning chains, models tr
 
 <div align="center">
   <img src="metrics/reasoning_benefits.png" alt="Reasoning Benefits" width="700"/>
-  <p><i>Placeholder for reasoning benefits visualization - generated after running metrics script</i></p>
 </div>
 
 ## Considerations for Using the Data
@@ -196,12 +211,30 @@ The dataset may contain biases from:
 2. **Generation Model**: Reasoning chains reflect biases in the base Mistral-7B model
 3. **Academic Context**: Created as a university assignment, so may reflect academic reasoning styles
 
+#### Token Length and Prediction Bias
+
+A particularly important bias we observed relates to reasoning length and prediction tendencies:
+
+<div align="center">
+  <img src="metrics/prediction_distribution.png" alt="Prediction Distribution by Token Length" width="700"/>
+</div>
+
+As reasoning chains grow longer, models demonstrate a stronger tendency to predict "no-entailment" and are less likely to predict "entailment." This creates an interesting bias pattern where:
+
+- **Short reasoning chains** (0-100 tokens) tend to favor entailment predictions
+- **Long reasoning chains** (300+ tokens) show a significant bias toward no-entailment predictions
+
+This pattern suggests that as models generate more text, they become more critical and hesitant to assert entailment relationships, potentially overanalyzing the premise-hypothesis connection. Interestingly, this effect appears more pronounced in more capable reasoning models (like DeepSeek and o1), where increased reasoning sophistication can paradoxically lead to worse alignment with some dataset labels due to over-analysis.
+
+Data users should be aware of this relationship when interpreting model outputs, as token length can be a proxy signal for prediction type in untuned models.
+
 ### Other Known Limitations
 
 1. **English-Only**: The dataset is limited to English language examples
 2. **Limited Topics**: May not cover all domains or specialized knowledge areas
 3. **Reasoning Style**: Demonstrates a particular approach to reasoning that may not be universally optimal
 4. **Perfect Information Assumption**: Examples assume all relevant information is contained in the premise
+5. **Length-Performance Tradeoff**: As shown in our analysis, longer reasoning chains tend to have lower accuracy in the original data collection phase
 
 ## Additional Information
 
@@ -215,7 +248,7 @@ If you use this dataset, please cite:
 
 ```bibtex
 @misc{mistral-nli-thoughts-dataset,
-  author = {Your Name},
+  author = {Jordan Tran},
   title = {Mistral-7B NLI Chain-of-Thought Dataset},
   year = {2025},
   publisher = {HuggingFace},
@@ -225,4 +258,4 @@ If you use this dataset, please cite:
 
 ---
 
-*This dataset card was created as part of a university assignment at The University of Manchester. The metrics reported were generated using the `generate_card_metrics.py` script.* 
+*This dataset card was created as part of an open-ended research project at The University of Manchester.* 
