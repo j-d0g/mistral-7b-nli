@@ -187,8 +187,6 @@ QLoRA was employed for fine-tuning to manage memory constraints.
 
 To ensure consistency and reproducibility across different hardware environments, we developed a Dockerized training environment. This approach was crucial given the complex dependencies between specific versions of CUDA, PyTorch, and various libraries like PEFT, TRL, and bitsandbytes.
 
-**[TODO: Add details about the Docker setup, base image, key dependencies]**
-
 #### Key Hyperparameters and Optimizations
 
 *   **Epochs:** Typically 2-5, with early stopping based on validation loss.
