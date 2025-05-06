@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 # ------------------------------------
 
 # --- Import get_prompt function ---
-from prompts import get_prompt
+from utils.prompts import get_prompt
 # --------------------
 
 from service.scoring_service import generate_score

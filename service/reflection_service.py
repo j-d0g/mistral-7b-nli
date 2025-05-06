@@ -5,7 +5,7 @@ from pprint import pprint
 from llm.base_llm import BaseLLM
 from models.response_models import ReflectionResponse
 from utils.json_helpers import clean_json, handle_json_error, handle_label_error
-from prompts import get_prompt
+from utils.prompts import get_prompt
 
 def persist_reflection(
     id,

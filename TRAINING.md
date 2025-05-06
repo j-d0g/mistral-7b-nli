@@ -47,14 +47,14 @@ The training workflow consists of these steps:
 Training is executed through the `run_training.sh` script in the repository root:
 
 ```bash
-# Basic usage with default configuration
-./run_training.sh
+# Basic usage with best configuration
+./run_training.sh --config train/configs/ablation1_best.py
 
-# Using a specific configuration
+# Using a specific ablation configuration
 ./run_training.sh --config train/configs/ablation0.py
 
 # Specifying GPU to use
-./run_training.sh --gpus 1 --config train/configs/default.py
+./run_training.sh --gpus 1 --config train/configs/ablation1_best.py
 
 # Multi-GPU training with specific GPUs
 ./run_training.sh --gpus 0,1 --config train/configs/distributed.py
@@ -74,8 +74,8 @@ Training is executed through the `run_training.sh` script in the repository root
 For quick tests or debugging, you can use sample data. We've included a ready-to-use configuration for this purpose:
 
 ```bash
-# Run with our pre-configured sample test configuration
-./run_training.sh --config train/configs/sample_test.py
+# Run with our pre-configured quick test configuration
+./run_training.sh --config train/configs/quick_test.py
 ```
 
 This configuration:
@@ -88,7 +88,7 @@ If you want to create your own test configuration:
 
 ```bash
 # First create a custom configuration based on the sample
-cp train/configs/sample_test.py train/configs/my_test.py
+cp train/configs/quick_test.py train/configs/my_test.py
 
 # Edit my_test.py to customize parameters
 
@@ -109,7 +109,7 @@ Training metrics are logged to Weights & Biases by default. To view metrics:
 To disable Weights & Biases logging:
 ```bash
 # Add no_wandb option when running training
-./run_training.sh --config train/configs/default.py --no_wandb
+./run_training.sh --config train/configs/ablation1_best.py --no_wandb
 ```
 
 ### Command-Line Monitoring
@@ -137,7 +137,7 @@ If training crashes unexpectedly:
 
 1. Check your Docker GPU setup (`nvidia-smi` should work inside container)
 2. Verify dataset paths and formats
-3. Try the `minimal_test.py` configuration which uses minimal resources
+3. Try the `quick_test.py` configuration which uses minimal resources
 4. Check for disk space limitations (HF cache and model outputs can be large)
 
 ### Resuming Training
@@ -145,13 +145,13 @@ If training crashes unexpectedly:
 To resume from a checkpoint after interruption:
 
 ```bash
-./run_training.sh --config train/configs/default.py --resume_from_checkpoint models/mistral-thinking-default/checkpoint-XXXX
+./run_training.sh --config train/configs/ablation1_best.py --resume_from_checkpoint models/mistral-thinking-ablation1-best/checkpoint-XXXX
 ```
 
 Or to resume from the latest checkpoint:
 
 ```bash
-./run_training.sh --config train/configs/default.py --resume_from_checkpoint latest
+./run_training.sh --config train/configs/ablation1_best.py --resume_from_checkpoint latest
 ```
 
 ## After Training
@@ -164,7 +164,7 @@ To evaluate your trained model on a test dataset, see [EVALUATION.md](EVALUATION
 
 ```bash
 # Evaluate the model on the test dataset
-./evaluate/run_inference.sh --model models/mistral-thinking-sample-test --data data/original_data/test.csv
+./run_inference.sh --model models/mistral-thinking-ablation1-best --data data/original_data/test.csv
 ```
 
 The evaluation script will generate detailed output files in the `results/` directory, including accuracy metrics and per-example predictions with thought processes.
@@ -218,22 +218,21 @@ A flexible configuration system manages hyperparameters and experiment settings.
 Managing numerous experiments with varying hyperparameters (learning rate, batch size, LoRA rank, etc.) purely through command-line arguments or complex bash scripts becomes unwieldy and difficult to reproduce. This Python-based config system addresses these issues:
 
 *   **Readability & Maintainability:** Python files are more readable than long bash commands. Comments explain parameter choices.
-*   **Structure & Defaults:** A `default.py` establishes base parameters, while specific experiment configs (e.g., `ablation2.py`) inherit from it and override only necessary values.
+*   **Structure & Defaults:** Each ablation has a base configuration and an optimized version (e.g., `ablation0.py` and `ablation0_best.py`), with the best overall configuration in `ablation1_best.py`.
 *   **Self-Documentation:** Each config file serves as a record of a specific experimental setup.
 *   **Flexibility:** Allows easy definition of complex settings while still permitting quick command-line overrides for minor tweaks.
 *   **Type Safety:** Python handles parameter types (int, float, bool) more robustly than bash.
 
 ### Components & Usage
 
-*   **`train/configs/default.py`:** Base configuration. Contains default values for most parameters:
+*   **`train/configs/ablation1_best.py`:** The overall best configuration. Contains optimal values for most parameters:
 
 ```python
 # Model and data paths
 model_id = "mistralai/Mistral-7B-v0.3"
 train_data = "data/finetune/train_ft.jsonl"
 eval_data = "data/finetune/dev_ft.jsonl"
-output_dir = "models/mistral-thinking-default"
-seed = 42
+output_dir = "models/mistral-thinking-ablation1-best"
 
 # LoRA parameters
 lora_r = 16
@@ -244,16 +243,16 @@ lora_dropout = 0.05
 num_epochs = 2
 max_seq_length = 512
 batch_size = 16
-grad_accumulation_steps = 2
+grad_accumulation_steps = 2  # Effective batch size: 32
 learning_rate = 2e-4
 lr_scheduler = "cosine"
 warmup_ratio = 0.03
 weight_decay = 0.01
-max_grad_norm = None  # No gradient clipping
+gradient_checkpointing = True  # Critical for performance
 ```
 
-*   **`train/configs/*.py`:** Specific experiment configurations (e.g., `ablation0.py`, `ablation1.py`, `ablation2.py`, `ablation3.py`, `minimal_test.py`, `distributed.py`). They typically start with `from configs.default import *` and then redefine specific variables.
-*   **`train/config_loader.py`:** A utility script that loads the default config, then loads the specified experiment config (if any), and finally applies any overrides passed via command-line arguments.
+*   **`train/configs/*.py`:** Specific experiment configurations (e.g., `ablation0.py`, `ablation0_best.py`, `ablation2.py`, `ablation2_best.py`, `quick_test.py`, `distributed.py`). Each config has a detailed docstring explaining its purpose and key characteristics.
+*   **`train/config_loader.py`:** A utility script that loads the specified config and applies any overrides passed via command-line arguments.
 *   **`train/train_sft.py`:** Imports and uses `config_loader.py` at the start to get the final configuration dictionary.
 *   **Activation:** The `--config path/to/config.py` argument is passed to `run_training.sh`, which forwards it to `train_sft.py`. CLI args like `--batch_size 8` or `--no_wandb` are also parsed and take final precedence.
 
@@ -343,11 +342,18 @@ Solutions:
 
 ## Training Ablations
 
-The project includes several training ablations to explore different data strategies:
+The project includes several training ablations to explore different configurations:
 
-1. **Ablation 0**: Train on correct examples + corrected versions of incorrect examples from the strong model.
-2. **Ablation 1**: Train only on examples where the original model's prediction was correct.
-3. **Ablation 2**: Train on examples where the original model's prediction was correct + reflected examples for incorrect predictions.
-3. **Ablation 3**: Train on all original examples, regardless of correctness.
+1. **Ablation 0**: Small batch training (effective batch size 16)
+   - **ablation0.py**: Base version with 1 epoch
+   - **ablation0_best.py**: Improved version with 2 epochs
 
-The ablation configurations are available in `train/configs/` directory and can be specified with the `--config` parameter. 
+2. **Ablation 1**: Medium batch with warmup variations (effective batch size 32)
+   - **ablation1.py**: Base version with higher warmup ratio (0.05), no gradient checkpointing
+   - **ablation1_best.py**: Best overall configuration with gradient checkpointing and lower warmup ratio (0.03)
+
+3. **Ablation 2**: Large model capacity (effective batch size 64, rank 32/alpha 64)
+   - **ablation2.py**: Base version with larger batch, higher rank, stability measures
+   - **ablation2_best.py**: Refined version with even lower learning rate (5e-5) and extended training (5 epochs)
+
+The ablation configurations are available in the `train/configs/` directory and can be specified with the `--config` parameter. 

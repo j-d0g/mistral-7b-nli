@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 # ------------------------------------
 
 # Import relevant functions
-from prompts import get_prompt, INITIAL_GENERATION_PROMPT, INITIAL_GENERATION_SCHEMA
+from utils.prompts import get_prompt, INITIAL_GENERATION_PROMPT, INITIAL_GENERATION_SCHEMA
 from service.prediction_service import predict_label, validate_response
 
 # Configure logging

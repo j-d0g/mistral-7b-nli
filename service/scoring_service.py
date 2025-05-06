@@ -8,7 +8,7 @@ from utils.json_helpers import (
     clean_json, handle_json_error, handle_label_error, 
     handle_score_error, handle_thought_process_error
 )
-from prompts import get_prompt  # Import get_prompt instead of specific prompts
+from utils.prompts import get_prompt  # Import get_prompt instead of specific prompts
 
 
 def persist_benchmarks(id,

@@ -1,9 +1,16 @@
 import os
 import sys
 import time
+import argparse
 from pathlib import Path
 from huggingface_hub import hf_hub_download, HfApi, list_repo_files
 from dotenv import load_dotenv
+
+# Parse command line arguments
+parser = argparse.ArgumentParser(description='Download models from HuggingFace Hub')
+parser.add_argument('--model', type=str, help='Specific model to download')
+parser.add_argument('--best', action='store_true', help='Download best model')
+args = parser.parse_args()
 
 # Automatically load environment variables from .env file
 if os.path.exists('.env'):
@@ -28,13 +35,13 @@ Example usage:
 
 # User info
 USERNAME = "jd0g"
-REPO_NAME = "Mistral-Thinking-NLI"
+REPO_NAME = "nlistral-7b-qlora"
 REPO_ID = f"{USERNAME}/{REPO_NAME}"
 LOCAL_MODEL_DIR = Path("models")
 
 # List of checkpoint model paths to download
-MODEL_PATHS = [
-    "mistral-thinking-default-epochs2", # Best model
+# MODEL_PATHS = [
+    # "mistral-thinking-default-epochs2", # Best model
     # "mistral-thinking-abl0",
     # "mistral-thinking-abl0-ext", # Second Best Model
     # "mistral-thinking-abl0-merged"
@@ -43,7 +50,16 @@ MODEL_PATHS = [
     # "mistral-thinking-abl2", # Third Best Model
     # "mistral-thinking-abl3", # Second Best Model
     # "mistral-7b-nli-cot"
+# ]
+
+MODEL_PATHS = [
+    "nlistral-7b-qlora-ablation0-best",     # Optimized setting for ablation study 0
+    "nlistral-7b-qlora-ablation1-best",     # Best ablation
+    "nlistral-7b-qlora-ablation2-best",     # Optimized setting for ablation study 2
 ]
+
+if args.best:
+    MODEL_PATHS = ["nlistral-7b-qlora-ablation1-best"]
 
 # Create the model directory if it doesn't exist
 os.makedirs(LOCAL_MODEL_DIR, exist_ok=True)

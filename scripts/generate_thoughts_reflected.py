@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 # ------------------------------------
 
 # --- Import necessary components ---
-from prompts import get_prompt
+from utils.prompts import get_prompt
 from utils.json_helpers import clean_json # Assuming json_helpers exists
 from models.response_models import NLIResponse # For potential reuse, though schema differs
 from dotenv import load_dotenv

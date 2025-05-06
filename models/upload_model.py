@@ -6,9 +6,15 @@ import os
 import sys
 import glob
 import time
+import argparse
 from pathlib import Path
 from huggingface_hub import HfApi, upload_folder
 from dotenv import load_dotenv
+
+# Parse command line arguments
+parser = argparse.ArgumentParser(description='Upload models to HuggingFace Hub')
+parser.add_argument('--model', type=str, help='Specific model to upload')
+args = parser.parse_args()
 
 # Automatically load environment variables from .env file
 if os.path.exists('.env'):
@@ -33,23 +39,24 @@ Example usage:
 
 # User info (default values)
 USERNAME = os.getenv("HF_USERNAME", "jd0g")
-REPO_NAME = os.getenv("HF_REPO_NAME", "Mistral-Thinking-NLI")
+REPO_NAME = os.getenv("HF_REPO_NAME", "nlistral-7b-qlora")
 REPO_ID = f"{USERNAME}/{REPO_NAME}"
 LOCAL_MODEL_DIR = Path("models")
 
-# List of checkpoint model paths to upload
-MODEL_PATHS = [
-    "mistral-thinking-abl3-final",
-    # "mistral-thinking-default-epochs2",
-    # "mistral-thinking-abl0",
-    # "mistral-thinking-abl0-ext",
-    # "mistral-thinking-abl0-merged"
-    # "mistral-thinking-abl0_dist",
-    # "mistral-thinking-abl1",
-    # "mistral-thinking-abl2",
-    # "mistral-thinking-abl3",
-    # "mistral-7b-nli-cot"
+# Updated list of model paths with new naming convention
+NEW_MODEL_PATHS = [
+    "nlistral-7b-qlora-ablation0-best",     # Optimized setting for ablation study 0
+    "nlistral-7b-qlora-ablation1-best",     # Best ablatio
+    "nlistral-7b-qlora-ablation2-best",     # Optimized setting for ablation study 2
 ]
+
+# Determine which models to upload
+if args.model:
+    # Upload a specific model
+    MODEL_PATHS = [args.model]
+else:
+    # Upload all models
+    MODEL_PATHS = NEW_MODEL_PATHS
 
 print(f"Preparing to upload models to {REPO_ID}...")
 

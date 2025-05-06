@@ -1,48 +1,40 @@
 """
-Distributed training configuration for Mistral-7B NLI fine-tuning.
-Optimized for 2x NVIDIA RTX 4090 GPUs.
+Multi-GPU Distributed Training Configuration
+
+This configuration adapts the best-performing setup (ablation1_best) for distributed training
+across multiple GPUs. It maintains the core parameters that gave the best results
+while adjusting batch size appropriately for multi-GPU scenarios.
+
+Key characteristics:
+- Based on the best configuration (ablation1_best)
+- Optimized for multiple GPUs (particularly 2x NVIDIA RTX 4090)
+- Per-GPU batch size of 8 for effective total batch size of 16 per GPU
+- Gradient checkpointing enabled for memory efficiency
+- Same LoRA parameters as the best config (rank 16, alpha 32)
 """
 
+# Import with a relative path that works both inside and outside Docker
+import sys
+import os
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Import the best config
+sys.path.insert(0, os.path.dirname(current_dir))
+from configs.ablation1_best import *
+
 # Model and data paths
-model_id = "mistralai/Mistral-7B-v0.3"
-train_data = "data/finetune/train_ft.jsonl"
-eval_data = "data/finetune/dev_ft.jsonl"
-output_dir = "models/mistral-7b-nli-cot-distributed"
-seed = 42
+output_dir = "models/mistral-thinking-distributed"
 
-# LoRA parameters
-lora_r = 16
-lora_alpha = 32
-lora_dropout = 0.05
-
-# Training parameters - adjusted for 2x 4090 GPUs
-# We can increase the batch size since we have 2 GPUs
-num_epochs = 3
-max_seq_length = 512
+# Training parameters - adjusted for multiple GPUs
 batch_size = 8  # Per-GPU batch size
-grad_accumulation_steps = 2
-learning_rate = 2e-4
-lr_scheduler = "cosine"
-warmup_ratio = 0.03
-weight_decay = 0.01
-max_grad_norm = None  # No gradient clipping
+num_epochs = 3  # Extended slightly for distributed setup
 
 # Evaluation and logging
-logging_steps = 25
-eval_steps = 250
-save_steps = 250
-save_total_limit = 2
+eval_steps = 250  # Less frequent evaluation with multiple GPUs
 
 # Wandb
-wandb_project = "mistral-thinking-nli"
-wandb_run_name = None  # Will be generated if not specified
-wandb_run_id = None
+wandb_project = "mistral_thinking_nli"
+wandb_run_name = "distributed"
 
-# Other settings
-use_packing = False
-gradient_checkpointing = True  # Important for memory efficiency
-use_wandb = True
-resume_from_checkpoint = None
-
-# Distributed training settings
+# Distributed training settings - explicitly enabled
 distributed_training = True 

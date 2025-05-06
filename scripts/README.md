@@ -1,51 +1,26 @@
-# Scripts for NLI Data Generation and Preparation
+# Data Processing Scripts
 
-This directory contains Python scripts used to generate Chain-of-Thought (CoT) data and prepare it for fine-tuning the NLI model.
+This directory contains the scripts used in the data preparation pipeline for NLI fine-tuning.
 
-## Core Scripts & Usage Examples
+## Key Components
 
-**1. Generate Initial Thoughts (`generate_thoughts.py`):**
-Creates CoT reasoning and predictions from a base CSV dataset using an LLM API.
+- `generate_thoughts.py`: Generates Chain-of-Thought reasoning for original examples
+- `generate_thoughts_reflected.py`: Creates improved reasoning for initially incorrect examples
+- `prepare_ft_data.py`: Combines correct examples and reflected examples into training data
+
+## Usage
+
+For detailed documentation on the data preparation process, including quickstart guides and technical details, please refer to the [DATA.md](../DATA.md) document in the project root.
+
+Basic usage examples:
 
 ```bash
-# Example using Mistral API on train.csv
-python scripts/generate_thoughts.py \
+# Generate thoughts for training data
+docker run --rm --gpus all -v $(pwd):/app -w /app mistral-nli-ft python3 scripts/generate_thoughts.py \
+  --api mistral \
   --input-csv data/original_data/train.csv \
   --output-json data/original_thoughts/train_thoughts.json \
-  --api mistral \
-  --model-name open-mistral-7b \
   --workers 6
 ```
 
-**2. Generate Reflected Thoughts (`generate_thoughts_reflected.py`):**
-Takes the output from `generate_thoughts.py`, identifies examples where the initial prediction was incorrect, and generates improved reasoning using an LLM API (potentially a stronger one).
-
-```bash
-# Example using Mistral API (Nemo model) on train_thoughts.json
-python scripts/generate_thoughts_reflected.py \
-  --input-thoughts-json data/original_thoughts/train_thoughts.json \
-  --output-reflection-json data/reflected_thoughts/train_reflections.json \
-  --api mistral \
-  --model-name open-mistral-nemo \
-  --workers 6
-```
-
-**3. Prepare Fine-tuning Data (`prepare_ft_data.py`):**
-Combines the *correct* examples from the initial thought generation with *all* examples from the reflected thought generation to create the final dataset for SFT (Supervised Fine-Tuning).
-
-```bash
-# Example combining train thoughts and reflections
-python scripts/prepare_ft_data.py \
-  --original-thoughts data/original_thoughts/train_thoughts.json \
-  --reflected-thoughts data/reflected_thoughts/train_reflections.json \
-  --output-file data/finetune/train_ft.jsonl
-```
-
-**Other Scripts:**
-
-*   `score_thoughts.py`: (Optional) Used for experimental scoring of thought process quality.
-*   `prepare_finetuning_data.py`: A more general script for formatting data with basic filtering (superseded by `prepare_ft_data.py` for the main workflow).
-
----
-
-*For detailed explanations of the data augmentation process, rationale, script parameters, and the full project workflow, please refer to the **[DATA_AUGMENTATION.md](../DATA_AUGMENTATION.md)** document and the main **[README.md](../README.md)** at the project root.*
+See the main [DATA.md](../DATA.md) for the complete pipeline and detailed explanations.

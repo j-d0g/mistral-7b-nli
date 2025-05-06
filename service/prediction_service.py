@@ -6,7 +6,7 @@ from pprint import pprint
 from llm.base_llm import BaseLLM
 from models.response_models import NLIResponse
 from utils.json_helpers import clean_json, handle_json_error, handle_label_error
-from prompts import get_prompt  # Import get_prompt instead of specific prompts
+from utils.prompts import get_prompt  # Import get_prompt instead of specific prompts
 
 
 def persist_benchmarks(id,

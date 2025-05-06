@@ -1,42 +1,57 @@
 """
-Configuration for Ablation 1: Standard training run
-Based on the parameters from training_runs.md
+Ablation 2: Large Model Capacity with Stability Measures
+
+This configuration tests increased model capacity and training stability measures
+to handle the complexity of the augmented data with potentially contradictory reasoning.
+
+Key characteristics:
+- Large effective batch size of 64 (batch_size=16, grad_accumulation_steps=4)
+- Doubled LoRA capacity (rank 32, alpha 64)
+- Stability measures: gradient clipping at 1.0, increased warmup ratio (0.10)
+- Lower learning rate (1e-4) appropriate for larger batch size
+- 3 epochs of training
 """
 
-# Import with a relative path that works both inside and outside Docker
-import sys
-import os
-current_dir = os.path.dirname(os.path.abspath(__file__))
-default_path = os.path.join(current_dir, 'default.py')
-
-# Import the default config
-sys.path.insert(0, os.path.dirname(current_dir))
-from configs.default import *
-
-
 # Model and data paths
-output_dir = "models/mistral-thinking-abl2"
+model_id = "mistralai/Mistral-7B-v0.3"
+train_data = "data/finetune/train_ft.jsonl"
+eval_data = "data/finetune/dev_ft.jsonl"
+output_dir = "models/mistral-thinking-ablation2"
+seed = 42
 
-# Training parameters
-num_epochs = 2
-batch_size = 16
-grad_accumulation_steps = 1
-learning_rate = 2e-4
-warmup_ratio = 0.03
-max_seq_length = 512
-
-# LoRA parameters
-lora_r = 16
-lora_alpha = 32
+# LoRA parameters - doubled capacity
+lora_r = 32  # Double rank for complex reasoning
+lora_alpha = 64  # Double alpha to maintain the same scaling
 lora_dropout = 0.05
 
+# Training parameters
+num_epochs = 3
+max_seq_length = 512
+batch_size = 16
+grad_accumulation_steps = 4  # Effective batch size: 64
+learning_rate = 1e-4  # Lower learning rate for stability
+lr_scheduler = "cosine"
+warmup_ratio = 0.10  # 10% warmup for better initialization
+weight_decay = 0.01
+max_grad_norm = 1.0  # Enable gradient clipping for stability
+
+# Evaluation and logging
+logging_steps = 25
+eval_steps = 250
+save_steps = 250
+save_total_limit = 2
+
 # Wandb
-use_wandb = True
-wandb_run_id = None
 wandb_project = "mistral_thinking_nli"
-wandb_name = "ablation2"
+wandb_run_name = "ablation2"
+wandb_run_id = None
 
 # Other settings
 use_packing = False
-gradient_checkpointing = False
+gradient_checkpointing = True  # Memory efficiency
+use_wandb = True
 resume_from_checkpoint = None
+gpu_id = 0
+
+# Distributed training settings
+distributed_training = False

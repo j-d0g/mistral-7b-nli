@@ -33,7 +33,7 @@ from utils.data_analysis import (
 # -------------------------------
 
 # --- Import get_prompt function ---
-from prompts import get_prompt
+from utils.prompts import get_prompt
 # --------------------
 
 from service.prediction_service import predict_label

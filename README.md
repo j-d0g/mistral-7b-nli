@@ -43,7 +43,7 @@ To get started with the project:
 
 5. **Evaluate your model**:
    ```bash
-   ./evaluate/run_inference.sh --model models/mistral-thinking-sample-test --data data/original_data/test.csv
+   ./run_inference.sh --model models/mistral-thinking-sample-test --data data/original_data/test.csv
    ```
 
 ## Repository Structure
@@ -55,8 +55,10 @@ To get started with the project:
 ├── DATA.md                      # Dataset documentation
 ├── TRAINING.md                  # Training documentation
 ├── EVALUATION.md                # Evaluation documentation
+├── PAPER.md                     # Research findings and methodology
 ├── prompts.py                   # Centralized prompt templates
 ├── run_training.sh              # Training wrapper script
+├── run_inference.sh             # Inference wrapper script
 ├── data/                        # Dataset files and scripts
 │   ├── original_data/           # Original NLI datasets (CSV)
 │   ├── original_thoughts/       # Generated thought processes
@@ -68,7 +70,6 @@ To get started with the project:
 │   ├── config_loader.py         # Configuration loading utility
 │   └── configs/                 # Training configurations
 ├── evaluate/                    # Evaluation components
-│   ├── run_inference.sh         # Inference script
 │   └── sample_model.py          # Model sampling implementation
 ├── models/                      # Model storage
 │   └── download_model.py        # Model download script

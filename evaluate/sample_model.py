@@ -33,7 +33,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(script_dir)
 sys.path.append(project_root)
 
-from prompts import FINETUNE_PROMPT
+from utils.prompts import FINETUNE_PROMPT
 # For loading LoRA adapters
 try:
     from peft import PeftModel, PeftConfig
