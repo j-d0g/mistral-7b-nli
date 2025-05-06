@@ -33,6 +33,8 @@ Before you begin training, ensure you have:
    ```
 4. **Created a Hugging Face token** (store in `.env` file as `HF_TOKEN=your_token_here`)
 
+> **Note:** Unlike data preparation which can be done locally with Python, **Docker is required** for the training process due to the complex GPU dependencies and compatibility requirements of quantization and PEFT libraries. The `run_training.sh` script is specifically designed to work within the Docker container environment.
+
 ## Training Process Overview
 
 The training workflow consists of these steps:

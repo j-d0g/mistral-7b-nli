@@ -10,3 +10,4 @@ logs/*
 !logs/thoughts/.gitkeep
 !logs/reflections/.gitkeep
 !logs/score/.gitkeep
+.env

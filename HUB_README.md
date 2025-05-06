@@ -1,5 +1,5 @@
 ---
-license: apache-2.0 # Or choose appropriate license
+license: apache-2.0
 tags:
 - natural-language-inference
 - nli
@@ -13,60 +13,59 @@ tags:
 
 # Mistral-7B Fine-tuned for NLI with Chain-of-Thought Reasoning
 
-This repository contains fine-tuned versions of `mistralai/Mistral-7B-v0.3` for Natural Language Inference (NLI), specifically trained to generate Chain-of-Thought (CoT) reasoning alongside the classification label (0 for no-entailment, 1 for entailment).
+This repository contains the best fine-tuned versions of `mistralai/Mistral-7B-v0.3` for Natural Language Inference (NLI), specifically trained to generate Chain-of-Thought (CoT) reasoning alongside the classification label (0 for no-entailment, 1 for entailment).
 
 The fine-tuning process and evaluation are detailed in the original project repository (consider adding link here if public).
 
-## Model Checkpoints & Ablations
+## Model Variants
 
-This repository hosts checkpoints from different fine-tuning runs (ablations), organized into subdirectories:
+This repository hosts the best checkpoint from each ablation study, representing different training configurations:
 
-*   **`Mistral_Thinking_Abl0`**: Checkpoints from the initial fine-tuning run (using combined correct + reflected data).
-    *   `checkpoint-2225`: Final checkpoint from this run.
+*   **`Ablation0_Best`**: The optimized small batch configuration.
     *   **Configuration Details**:
         * Base model: `mistralai/Mistral-7B-v0.3`
-        * Effective batch size: 32 (16 per device × 2 gradient accumulation steps)
+        * Effective batch size: 16 (8 per device × 2 gradient accumulation steps)
         * Learning rate: 2e-4 with cosine scheduler and 3% warmup ratio
-        * Training: 3 epochs with early stopping (eval_loss)
+        * Training: 2 epochs 
         * LoRA Config: r=16, alpha=32, dropout=0.05
         * Target modules: q_proj, k_proj, v_proj, o_proj
         * Sequence length: 512 tokens
         * 4-bit quantization with NF4 and double quantization
-        * WandB logging enabled
 
-*   **`Mistral_Thinking_Abl1`**: Checkpoints from an ablation focused on addressing potentially conflicting reasoning paths identified during data generation, where the base model showed bias towards "no entailment".
-    *   `checkpoint-1250`: Final checkpoint from this run.
-    *   **Configuration Details**:
-        * Used filtered dataset with only correct examples from original generation
-        * Similar configuration to Abl0.2 but with different dataset strategy
-        * Focused on eliminating conflicting reasoning patterns
-        * Results in cleaner reasoning paths but potentially narrower reasoning diversity
-
-*   **`Mistral_Thinking_Abl2`**: Checkpoints from a follow-up run based on Ablation 0. This run aimed to address token repetition issues (potentially related to EOS/padding) and was trained for significantly more epochs.
-    *   `checkpoint-2000`: Final checkpoint from this extended run.
+*   **`Ablation1_Best`**: The optimized medium batch configuration.
     *   **Configuration Details**:
         * Base model: `mistralai/Mistral-7B-v0.3`
-        * Effective batch size: 16 (8 per device × 2 gradient accumulation steps)
-        * Learning rate: 2e-4 with cosine scheduler
-        * Extended training duration (approximately 2× longer than Abl0)
-        * LoRA Config: Same as Abl0 (r=16, alpha=32, dropout=0.05)
-        * Resume from: `Mistral_Thinking_Abl0/checkpoint-2225`
-        * Gradient checkpointing: Disabled
-        * WandB run ID: jnz6en9a
+        * Effective batch size: 32 (16 per device × 2 gradient accumulation steps)
+        * Learning rate: 2e-4 with cosine scheduler and 3% warmup ratio
+        * LoRA Config: r=16, alpha=32, dropout=0.05
+        * Gradient checkpointing enabled for memory efficiency
+        * Optimized for performance with tuned warmup ratio
+
+*   **`Ablation2_Best`**: The refined large model configuration.
+    *   **Configuration Details**:
+        * Base model: `mistralai/Mistral-7B-v0.3`
+        * Effective batch size: 64 (16 per device × 4 gradient accumulation steps)
+        * Ultra-low learning rate: 5e-5 with cosine scheduler
+        * Extended training: 5 epochs
+        * Moderate warmup ratio: 5%
+        * LoRA Config: r=32, alpha=64, dropout=0.05
+        * Stability measures: gradient clipping at 1.0
 
 ## Configuration Differences
 
-The ablations differ in several key aspects:
+The models represent different training approaches with increasing complexity:
 
-| Parameter | Ablation 0 | Ablation 1 | Ablation 2 |
-|-----------|--------------|--------------|------------|
-| Batch Size | 16 per device | 8 per device | 8 per device |
-| Gradient Accumulation | 2 steps | 2 steps | 2 steps |
-| Effective Batch Size | 32 | 16 | 16 |
-| Dataset | Combined (correct + reflected) | Correct examples only | Combined (refined) |
-| Training Duration | Early stopped | Standard | Extended (2×) |
-| Checkpoint Resumption | None | None | From Abl0 (ckpt-2225) |
-| Primary Focus | Initial run | Addressing reasoning conflicts | Fixing token repetition |
+| Parameter | Ablation 0 Best | Ablation 1 Best | Ablation 2 Best |
+|-----------|----------------|----------------|----------------|
+| Batch Size | 8 per device | 16 per device | 16 per device |
+| Gradient Accumulation | 2 steps | 2 steps | 4 steps |
+| Effective Batch Size | 16 | 32 | 64 |
+| Learning Rate | 2e-4 | 2e-4 | 5e-5 |
+| LoRA Rank | 16 | 16 | 32 |
+| LoRA Alpha | 32 | 32 | 64 |
+| Training Duration | 2 epochs | 2 epochs | 5 epochs |
+| Gradient Checkpointing | Disabled | Enabled | Enabled |
+| Primary Focus | Small batch | Medium batch with optimization | Large model with stability |
 
 ## Technical Implementation Details
 
@@ -75,28 +74,22 @@ All models use Parameter-Efficient Fine-Tuning (PEFT) with QLoRA:
 - **Quantization**: 4-bit with NF4 type and double quantization
 - **Optimizer**: paged_adamw_8bit with weight decay 0.01
 - **Loss**: Standard autoregressive language modeling loss
-- **Scheduler**: Cosine with 3% warmup ratio
-- **PEFT Config**: LoRA with r=16, alpha=32, dropout=0.05
+- **Scheduler**: Cosine with warmup
 - **Target Modules**: Query, Key, Value, and Output projections
 
 This configuration balances efficiency and performance, allowing fine-tuning of the 7B parameter model on consumer hardware while maintaining high quality outputs.
 
-## Loading a Specific Checkpoint
+## Loading a Model
 
-You can load a specific checkpoint using the `subfolder` argument with the `transformers` library:
+You can load any of the models using the `peft` library:
 
 ```python
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from peft import PeftModel
 
 repo_id = "jd0g/Mistral-v0.3-Thinking_NLI"
-# Choose the desired ablation and checkpoint subdirectory
-# Example for Abl0 final checkpoint:
-subfolder_path_abl0 = "Mistral_Thinking_Abl0/checkpoint-2225"
-# Example for Abl1 final checkpoint:
-subfolder_path_abl1 = "Mistral_Thinking_Abl1/checkpoint-1250"
-# Example for Abl2 final checkpoint:
-subfolder_path_abl2 = "Mistral_Thinking_Abl2/checkpoint-2000"
+# Choose the desired model variant
+model_variant = "Ablation2_Best"  # Options: "Ablation0_Best", "Ablation1_Best", "Ablation2_Best"
 
 # Load the base model with 4-bit quantization
 base_model_name = "mistralai/Mistral-7B-v0.3"
@@ -112,8 +105,8 @@ base_model = AutoModelForCausalLM.from_pretrained(
     device_map="auto"
 )
 
-# Load the PeftModel (adapter) - Choose the correct subfolder
-model = PeftModel.from_pretrained(base_model, repo_id, subfolder=subfolder_path_abl2)
+# Load the PeftModel (adapter)
+model = PeftModel.from_pretrained(base_model, repo_id, subfolder=model_variant)
 
 # Load the tokenizer
 tokenizer = AutoTokenizer.from_pretrained(base_model_name)
@@ -135,11 +128,11 @@ print(tokenizer.decode(outputs[0], skip_special_tokens=True))
 
 ## Intended Use
 
-These models are designed for NLI tasks where understanding the reasoning process (via CoT) is valuable. The main differences between the ablations:
+These models are designed for NLI tasks where understanding the reasoning process (via CoT) is valuable. The main differences between the variants:
 
-- **Ablation 0**: Good general-purpose model with balance of performance and reasoning
-- **Ablation 1**: Cleaner reasoning patterns but potentially less diverse thinking
-- **Ablation 2**: Improved token generation with fewer repetition artifacts
+- **Ablation 0 Best**: Good overall balance of performance and reasoning with a small batch approach
+- **Ablation 1 Best**: Enhanced performance with medium batch size and memory optimization
+- **Ablation 2 Best**: Highest capacity and stability, best for complex reasoning tasks
 
 All models output both detailed reasoning and a final classification label in JSON format.
 

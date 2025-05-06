@@ -34,6 +34,8 @@ Before you begin evaluating models, ensure you have:
    ```
 4. **Either a trained model or a downloaded model checkpoint**
 
+> **Note:** Unlike data preparation which can be run locally with Python, **Docker is required** for model evaluation due to the complex GPU dependencies, model quantization requirements, and compatibility needs. The `run_inference.sh` script is specifically designed to work within the Docker container environment to ensure consistent results across different hardware setups.
+
 ## Evaluating a Model
 
 ### Option 1: Evaluating Your Own Trained Model

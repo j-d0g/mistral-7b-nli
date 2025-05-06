@@ -11,6 +11,7 @@ This document provides instructions for preparing the datasets needed for fine-t
   - [Next Steps](#next-steps)
 - [Deep Dive: Data Preparation Pipeline](#deep-dive-data-preparation-pipeline)
   - [Complete Pipeline Workflow](#complete-pipeline-workflow)
+  - [Running Locally vs. Docker](#running-locally-vs-docker)
   - [Stage 1: Generate Thoughts](#stage-1-generate-thoughts)
   - [Stage 2: Generate Reflections](#stage-2-generate-reflections)
   - [Stage 3: Prepare Fine-tuning Data](#stage-3-prepare-fine-tuning-data)
@@ -26,12 +27,13 @@ This document provides instructions for preparing the datasets needed for fine-t
 
 Before you begin with the datasets, ensure you have:
 
-1. **Docker installed** with NVIDIA Container Toolkit (for GPU support)
-2. **Built the Docker image**:
+1. **Docker installed (Optional)** with NVIDIA Container Toolkit (for GPU support)
+2. **Built the Docker image (Optional)**:
    ```bash
    docker build -t mistral-nli-ft .
    ```
 3. **Created a Hugging Face token** (store in `.env` file as `HF_TOKEN=your_token_here`)
+4. **Created a Mistral API Key** (store in `.env` file as `MISTRAL_API_KEY=your_token_here`)
 
 ## Downloading Pre-Generated Datasets
 
@@ -94,20 +96,58 @@ The data preparation involves three main stages, processed separately for traini
 └─────────────┘     └─────────────────┘     └───────────────────┘     └────────────────┘
 ```
 
-## Stage 1: Generate Thoughts
+## Running Locally vs. Docker
 
-In this stage, we add Chain-of-Thought reasoning to the original CSV examples. This involves prompting the Mistral API to generate step-by-step reasoning for each example.
+The data preparation scripts are **computationally lightweight** since they primarily make API calls and process the results. While Docker examples are provided below for consistency, the **recommended approach** is to run these scripts directly on your local machine:
 
 ```bash
-# Process training data
-docker run --rm --gpus all -v $(pwd):/app -w /app mistral-nli-ft python3 scripts/generate_thoughts.py \
+# Stage 1: Generate Thoughts (local Python)
+python3 scripts/generate_thoughts.py \
   --api mistral \
   --input-csv data/original_data/train.csv \
   --output-json data/original_thoughts/train_thoughts.json \
   --workers 6
 
-# Process validation data
-docker run --rm --gpus all -v $(pwd):/app -w /app mistral-nli-ft python3 scripts/generate_thoughts.py \
+# Stage 2: Generate Reflections (local Python)
+python3 scripts/generate_thoughts_reflected.py \
+  --api mistral \
+  --model-name open-mistral-7b \
+  --input-thoughts-json data/original_thoughts/train_thoughts.json \
+  --output-reflection-json data/reflected_thoughts/train_reflections.json \
+  --workers 6
+
+# Stage 3: Prepare Fine-tuning Data (local Python)
+python3 scripts/prepare_ft_data.py \
+  --original-thoughts data/original_thoughts/train_thoughts.json \
+  --reflected-thoughts data/reflected_thoughts/train_reflections.json \
+  --output-file data/finetune/train_ft.jsonl
+```
+
+Running locally avoids Docker overhead and simplifies environment management for these API-focused tasks. You'll only need to install a few dependencies:
+
+```bash
+pip install requests tqdm python-dotenv
+```
+
+If you prefer to use Docker, or are using the same machine as for training, the equivalent docker commands are provided in the sections below.
+
+## Stage 1: Generate Thoughts
+
+In this stage, we add Chain-of-Thought reasoning to the original CSV examples. This involves prompting the Mistral API to generate step-by-step reasoning for each example.
+```bash
+# Build Docker 
+§
+
+```bash
+# Process training data (Docker version)
+docker run --rm -v $(pwd):/app -w /app mistral-nli-ft python3 scripts/generate_thoughts.py \
+  --api mistral \
+  --input-csv data/original_data/train.csv \
+  --output-json data/original_thoughts/train_thoughts.json \
+  --workers 6
+
+# Process validation data (Docker version)
+docker run --rm -v $(pwd):/app -w /app mistral-nli-ft python3 scripts/generate_thoughts.py \
   --api mistral \
   --input-csv data/original_data/dev.csv \
   --output-json data/original_thoughts/dev_thoughts.json \
@@ -125,16 +165,16 @@ The script outputs a JSON file containing each example with:
 This stage identifies incorrect examples from Stage 1 and generates improved reasoning. It uses a potentially stronger model to reflect on the errors and provide better explanations.
 
 ```bash
-# Process training data
-docker run --rm --gpus all -v $(pwd):/app -w /app mistral-nli-ft python3 scripts/generate_thoughts_reflected.py \
+# Process training data (Docker version)
+docker run --rm -v $(pwd):/app -w /app mistral-nli-ft python3 scripts/generate_thoughts_reflected.py \
   --api mistral \
   --model-name open-mistral-7b \
   --input-thoughts-json data/original_thoughts/train_thoughts.json \
   --output-reflection-json data/reflected_thoughts/train_reflections.json \
   --workers 6
 
-# Process validation data
-docker run --rm --gpus all -v $(pwd):/app -w /app mistral-nli-ft python3 scripts/generate_thoughts_reflected.py \
+# Process validation data (Docker version)
+docker run --rm -v $(pwd):/app -w /app mistral-nli-ft python3 scripts/generate_thoughts_reflected.py \
   --api mistral \
   --model-name open-mistral-7b \
   --input-thoughts-json data/original_thoughts/dev_thoughts.json \

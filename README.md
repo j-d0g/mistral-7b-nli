@@ -46,6 +46,25 @@ To get started with the project:
    ./run_inference.sh --model models/mistral-thinking-sample-test --data data/original_data/test.csv
    ```
 
+## Docker Usage & Environment Setup
+
+This project uses Docker to ensure reproducibility, particularly for GPU-intensive operations:
+
+- **Data Augmentation**: The thought generation and reflection scripts (`scripts/generate_thoughts.py`, `scripts/generate_thoughts_reflected.py`, etc.) are **computationally lightweight** and can be run directly on your local machine using Python. This is the **recommended approach** for the data preparation phase as it avoids Docker overhead for API-based operations.
+
+- **Training & Inference**: All training, fine-tuning, and model inference operations require specific GPU libraries and dependencies. For these operations, **using Docker is strongly recommended** to ensure compatibility and reproducibility across different hardware environments. The `run_training.sh` and `run_inference.sh` scripts are specifically designed to work with the Docker container.
+
+You can choose the appropriate approach based on which part of the pipeline you're working with:
+
+```bash
+# For data augmentation (local Python recommended)
+python3 scripts/generate_thoughts.py --api mistral --input-csv data/original_data/train.csv --output-json data/original_thoughts/train_thoughts.json
+
+# For training and inference (Docker required)
+./run_training.sh --config train/configs/sample_test.py
+./run_inference.sh --model models/mistral-thinking-sample-test --data data/sample/demo.csv
+```
+
 ## Repository Structure
 
 ```
