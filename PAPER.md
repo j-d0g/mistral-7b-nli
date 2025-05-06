@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # NLIstral-7B-QLoRA: Interpretable NLI with Augmented Chain-of-Thought Fine-Tuning
+=======
+# NLIstral-QLoRA-7B: Interpretable NLI with Augmented Chain-of-Thought Fine-Tuning
+>>>>>>> 22b706956451ca2a2b779a74bce236aa6cf08a69
 
 ## Abstract
 
