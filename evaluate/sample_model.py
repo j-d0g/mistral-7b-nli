@@ -544,6 +544,35 @@ def run_inference(model, tokenizer, test_data, args):
 def main():
     args = parse_args()
     
+    # Load test data
+    print(f"Loading test data from: {args.test_file}")
+    test_data = pd.read_csv(args.test_file)
+    print(f"Loaded {len(test_data)} test samples")
+    
+    # Auto-generate output filenames in the required format
+    # Extract model name from model_id
+    model_name = os.path.basename(args.model_id.rstrip('/'))
+    
+    # Extract data file name from test_file
+    data_file = os.path.splitext(os.path.basename(args.test_file))[0]
+    
+    # Check if data has labels
+    has_labels = 'label' in test_data.columns
+    label_suffix = 'labelled' if has_labels else 'unlabelled'
+    
+    # Create filename in the required format
+    filename = f"{model_name}-{data_file}-{label_suffix}"
+    
+    # Override output paths unless explicitly specified by user
+    if args.output_file == "results/predictions.json":  # Using default value
+        args.output_file = f"results/{filename}.json"
+        print(f"Auto-generated output filename: {args.output_file}")
+    
+    # Also set CSV output if not explicitly specified
+    if args.output_csv is None:
+        args.output_csv = f"results/{filename}.csv"
+        print(f"Auto-generated CSV filename: {args.output_csv}")
+    
     # Ensure output directory exists
     output_dir = os.path.dirname(args.output_file)
     if output_dir: # Create directory only if output_file path includes a directory
@@ -554,11 +583,6 @@ def main():
         csv_output_dir = os.path.dirname(args.output_csv)
         if csv_output_dir:
             os.makedirs(csv_output_dir, exist_ok=True)
-
-    # Load test data
-    print(f"Loading test data from: {args.test_file}")
-    test_data = pd.read_csv(args.test_file)
-    print(f"Loaded {len(test_data)} test samples")
     
     # Set the environment variable to use the specific GPU
     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu_id)

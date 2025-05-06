@@ -28,7 +28,7 @@ Example usage:
 
 # User info (default values for results dataset)
 USERNAME = os.getenv("HF_USERNAME", "jd0g")
-REPO_NAME = os.getenv("HF_RESULTS_REPO_NAME", "Mistral-NLI-Results") # Default repo for results
+REPO_NAME = os.getenv("HF_RESULTS_REPO_NAME", "nlistral-7b-results") # Updated repo name for results
 REPO_ID = f"{USERNAME}/{REPO_NAME}"
 LOCAL_RESULTS_DIR = Path("results")
 

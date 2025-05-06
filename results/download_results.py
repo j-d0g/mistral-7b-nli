@@ -27,7 +27,7 @@ Example usage:
 
 # User info (default values for results dataset)
 USERNAME = os.getenv("HF_USERNAME", "jd0g")
-REPO_NAME = os.getenv("HF_RESULTS_REPO_NAME", "Mistral-NLI-Results") # Default repo for results
+REPO_NAME = os.getenv("HF_RESULTS_REPO_NAME", "nlistral-7b-results") # Default repo for results
 REPO_ID = f"{USERNAME}/{REPO_NAME}"
 LOCAL_RESULTS_DIR = Path("results")
 
@@ -46,7 +46,7 @@ ERROR: Invalid or expired Hugging Face token
 
 Please ensure your token has appropriate permissions and hasn't expired.
 Generate a new token at https://huggingface.co/settings/tokens
-"""")
+""")
         sys.exit(1)
     
     # Check if dataset repository exists
@@ -90,7 +90,7 @@ This could be due to:
 1. Repository permissions (you need read access)
 2. Network connectivity issues
 3. Invalid repository ID
-"""")
+""")
     sys.exit(1)
 
 print(f"""

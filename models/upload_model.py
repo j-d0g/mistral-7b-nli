@@ -43,20 +43,28 @@ REPO_NAME = os.getenv("HF_REPO_NAME", "nlistral-7b-qlora")
 REPO_ID = f"{USERNAME}/{REPO_NAME}"
 LOCAL_MODEL_DIR = Path("models")
 
-# Updated list of model paths with new naming convention
-NEW_MODEL_PATHS = [
-    "nlistral-7b-qlora-ablation0-best",     # Optimized setting for ablation study 0
-    "nlistral-7b-qlora-ablation1-best",     # Best ablatio
-    "nlistral-7b-qlora-ablation2-best",     # Optimized setting for ablation study 2
+# Updated list of model paths with actual directory names
+MODEL_PATHS = [
+    "nlistral-ablation0",     # Ablation 0 model
+    "nlistral-ablation1",     # Ablation 1 model
+    "nlistral-ablation2",     # Ablation 2 model
 ]
+
+# Map of local directory names to remote (HF) directory names
+MODEL_NAME_MAPPING = {
+    "nlistral-ablation0": "nlistral-7b-qlora-ablation0-best",
+    "nlistral-ablation1": "nlistral-7b-qlora-ablation1-best",
+    "nlistral-ablation2": "nlistral-7b-qlora-ablation2-best",
+}
 
 # Determine which models to upload
 if args.model:
     # Upload a specific model
-    MODEL_PATHS = [args.model]
-else:
-    # Upload all models
-    MODEL_PATHS = NEW_MODEL_PATHS
+    if args.model in MODEL_PATHS:
+        MODEL_PATHS = [args.model]
+    else:
+        print(f"⚠ Specified model '{args.model}' not found. Available models: {', '.join(MODEL_PATHS)}")
+        sys.exit(1)
 
 print(f"Preparing to upload models to {REPO_ID}...")
 
@@ -125,15 +133,18 @@ Generate a new token at https://huggingface.co/settings/tokens
         files_to_upload = list(glob.glob(str(full_path / "*")))
         print(f"Found {len(files_to_upload)} files to upload")
         
+        # Get the HF path (mapped name or original if no mapping exists)
+        hf_path = MODEL_NAME_MAPPING.get(model_path, model_path)
+        
         # Upload to HF Hub
         try:
             api.upload_folder(
                 folder_path=str(full_path),
                 repo_id=REPO_ID,
                 repo_type="model",
-                path_in_repo=model_path
+                path_in_repo=hf_path
             )
-            print(f"✓ Successfully uploaded {model_path}")
+            print(f"✓ Successfully uploaded {model_path} to {hf_path}")
         except Exception as e:
             print(f"⚠ Error uploading {model_path}: {e}")
     
