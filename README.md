@@ -16,6 +16,38 @@ We provide comprehensive documentation for each stage of the project:
 
 Each document includes both a Quick Start guide for getting up and running quickly, as well as a Deep Dive section with technical details.
 
+## Documentation Guide
+
+This repository is split into three parts:
+
+1. **[DATA.md](DATA.md)** - Synthetic Chain-of-Thought augmentation of NLI Dataset
+2. **[TRAINING.md](TRAINING.md)** - Model training and fine-tuning
+3. **[EVALUATION.md](EVALUATION.md)** - Model evaluation and inference
+
+These guides explain how to use the repository as a quickstart user and contain a deep dive should you be interested in the technical implementation.
+
+Additional documentation:
+
+* **README.md** - Project overview and setup instructions
+* **PAPER.md** - Academic research paper with methodology and results
+* **BLOG.md** - Chronological narrative of the experimental journey
+
+### Key Directories
+
+* **data/** - Datasets and processing scripts
+* **train/** - Training implementation and configs
+* **evaluate/** - Inference and metrics code
+* **scripts/** - Supporting utilities for data processing and analysis
+* **results/** - Outputs from model evaluation
+* **metrics/** - Visualization outputs and performance metrics
+* **models/** - Storage for trained model checkpoints
+
+### Recommended Reading Path
+
+* **First-time users:** Start with README.md, then follow the three core pillars in order (DATA → TRAINING → EVALUATION)
+* **Understanding results:** Start with EVALUATION.md, then explore PAPER.md for deeper analysis
+* **Understanding methodology:** Read BLOG.md for the narrative journey, then PAPER.md for formalized approach
+
 ## Quick Start
 
 To get started with the project:
@@ -74,10 +106,14 @@ python3 scripts/generate_thoughts.py --api mistral --input-csv data/original_dat
 ├── DATA.md                      # Dataset documentation
 ├── TRAINING.md                  # Training documentation
 ├── EVALUATION.md                # Evaluation documentation
+├── BLOG.md                      # Experimental journey narrative
+├── HUB_MODEL.md                 # Model card documentation
+├── HUB_DATASET.md               # Dataset card documentation
 ├── PAPER.md                     # Research findings and methodology
 ├── prompts.py                   # Centralized prompt templates
 ├── run_training.sh              # Training wrapper script
 ├── run_inference.sh             # Inference wrapper script
+├── run_metrics.sh               # Metrics generation script
 ├── data/                        # Dataset files and scripts
 │   ├── original_data/           # Original NLI datasets (CSV)
 │   ├── original_thoughts/       # Generated thought processes
@@ -90,17 +126,22 @@ python3 scripts/generate_thoughts.py --api mistral --input-csv data/original_dat
 │   └── configs/                 # Training configurations
 ├── evaluate/                    # Evaluation components
 │   └── sample_model.py          # Model sampling implementation
-├── models/                      # Model storage
-│   └── download_model.py        # Model download script
 ├── scripts/                     # Data preparation scripts
 │   ├── generate_thoughts.py     # Generate CoT reasoning
 │   ├── generate_thoughts_reflected.py # Generate reflections
 │   ├── prepare_ft_data.py       # Prepare fine-tuning data
 │   └── analysis/                # Data analysis & visualization
-│       ├── analyze_token_lengths.py    # Token length analysis
-│       ├── generate_card_visualizations.py # Create visualizations
-│       └── README.md            # Analysis scripts documentation
-└── results/                     # Evaluation results storage
+├── models/                      # Model storage
+│   └── download_model.py        # Model download script
+├── results/                     # Evaluation results storage
+├── metrics/                     # Visualization outputs and metrics
+├── figures/                     # Diagrams and visualizations
+├── utils/                       # Utility functions and helpers
+├── logs/                        # Log files from training runs
+├── tests/                       # Test files for the project
+├── wandb/                       # Weights & Biases logging data
+├── llm/                         # LLM interface utilities
+└── service/                     # API and service implementations
 ```
 
 ## Project Highlights
