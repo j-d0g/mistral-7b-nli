@@ -51,7 +51,7 @@ ERROR: Invalid or expired Hugging Face token
 
 Please ensure your token has appropriate permissions and hasn't expired.
 Generate a new token at https://huggingface.co/settings/tokens
-"""")
+""")
         sys.exit(1)
 
     # Check repository exists or create it as a dataset
@@ -97,7 +97,7 @@ This could be due to:
 1. Repository permissions (you need write access)
 2. Network connectivity issues
 3. Invalid repository ID
-"""")
+""")
     sys.exit(1)
 
 print(f"""
