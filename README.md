@@ -95,7 +95,11 @@ python3 scripts/generate_thoughts.py --api mistral --input-csv data/original_dat
 ├── scripts/                     # Data preparation scripts
 │   ├── generate_thoughts.py     # Generate CoT reasoning
 │   ├── generate_thoughts_reflected.py # Generate reflections
-│   └── prepare_ft_data.py       # Prepare fine-tuning data
+│   ├── prepare_ft_data.py       # Prepare fine-tuning data
+│   └── analysis/                # Data analysis & visualization
+│       ├── analyze_token_lengths.py    # Token length analysis
+│       ├── generate_card_visualizations.py # Create visualizations
+│       └── README.md            # Analysis scripts documentation
 └── results/                     # Evaluation results storage
 ```
 

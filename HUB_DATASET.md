@@ -79,6 +79,8 @@ To enhance reasoning quality, we implemented a novel reflection mechanism:
    ```
 3. Refined reasoning chains based on these reflections
 
+Approximately 24.26% of the dataset (9,597 examples) underwent this reflection process, resulting in improved reasoning quality and alignment with the expected labels.
+
 ### Data Processing
 
 The final dataset underwent several processing steps:
@@ -125,8 +127,8 @@ The final dataset underwent several processing steps:
 | Training Set | 35,597 (90.01%) |
 | Validation Set | 1,977 (5.00%) |
 | Test Set | 1,972 (4.99%) |
-| Entailment Examples | 21,429 (51.61%) |
-| Non-entailment Examples | 20,093 (48.39%) |
+| Entailment Examples | 13,248 (33.50%) |
+| Non-entailment Examples | 26,298 (66.50%) |
 
 ### Token Length Analysis
 

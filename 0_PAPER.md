@@ -67,7 +67,7 @@ Our system integrates a multi-stage data augmentation pipeline with parameter-ef
 
 1.  **Multi-Stage Data Augmentation (The Reflection-CoT Pipeline):**
     *   **Stage 1: Initial CoT Generation:** All premise-hypothesis pairs are processed by `open-mistral-7b` to generate an initial CoT and predicted label. This captures the baseline reasoning tendencies of a Mistral-7B class model.
-    *   **Stage 2: Error Identification & Reflection Trigger:** Examples where the initial prediction from Stage 1 mismatches the dataset's ground-truth label are flagged (approx. 30% of cases).
+    *   **Stage 2: Error Identification & Reflection Trigger:** Examples where the initial prediction from Stage 1 mismatches the dataset's ground-truth label are flagged (approx. 24.26% of cases).
     *   **Stage 3: Reflection-CoT Generation:** For flagged examples, the `open-mistral-nemo` (12B parameter) model is employed. It receives the premise, hypothesis, the *true label*, and the *original flawed CoT from `open-mistral-7b`*. Its task is to analyze the prior error and generate a corrected CoT that leads to the true label. The use of a more powerful 12B model for reflection is crucial, as this meta-reasoning task (analyzing and correcting another model's complex reasoning) requires greater capacity than the initial CoT generation. This specific contextual input guides `open-mistral-nemo` to produce targeted corrections rather than entirely new, potentially unrelated reasoning paths.
     *   **Stage 4: Final Dataset Assembly:** The fine-tuning dataset is composed of (a) examples correctly processed in Stage 1, and (b) examples corrected through the Reflection-CoT mechanism in Stage 3. This ensures comprehensive coverage and high-quality reasoning paths for all original examples.
 
@@ -124,7 +124,7 @@ This pre-label alignment is particularly valuable in cases where label subjectiv
 
 #### Reflection on Errors: The Reflection-CoT Mechanism
 
-A core component of our methodology is the **Reflection-CoT mechanism**, designed to address instances where the initial CoT generation by `open-mistral-7b` yielded predictions inconsistent with the provided dataset labels (approximately 30% of cases, as noted in experiment logs, `BLOG.md`).
+A core component of our methodology is the **Reflection-CoT mechanism**, designed to address instances where the initial CoT generation by `open-mistral-7b` yielded predictions inconsistent with the provided dataset labels (approximately 24.26% of cases, as noted in experiment logs, `BLOG.md`).
 
 **Addressing Label Disagreement & Limitations of Automated Correction:** Initial explorations (detailed in experiment logs, `BLOG.md`) into resolving these disagreements by attempting to automatically guide the model towards the correct label without explicit instruction (i.e., "correct naturally" through iterative self-scoring with stronger models) proved both prohibitively expensive (estimated >£100 in API costs for a subset) and largely ineffective. Models often struggled to find coherent, natural reasoning paths to the target label, reinforcing concerns about dataset label subjectivity and the limitations of purely automated refinement in such scenarios.
 
@@ -158,7 +158,7 @@ This strategy aimed to leverage the strengths of both models and ensure the fine
 
 Based on our analysis of the final dataset, we identified the following key characteristics:
 
-1. **Size and Distribution**: The dataset consists of 41,522 total examples, with 37,571 training examples (90.48%), 1,977 validation examples (4.76%), and 1,974 test examples (4.75%). The distribution of labels is well-balanced, with 21,429 entailment examples (51.61%) and 20,093 no-entailment examples (48.39%).
+1. **Size and Distribution**: The dataset consists of 39,546 total examples, with 35,597 training examples (90.01%), 1,977 validation examples (5.00%), and 1,972 test examples (4.99%). The distribution of labels is well-balanced, with 13,248 entailment examples (33.50%) and 26,298 no-entailment examples (66.50%).
 
 2. **Token Length Analysis**: As shown in Figure 4, the statistical analysis of token lengths revealed:
 
@@ -171,7 +171,7 @@ Based on our analysis of the final dataset, we identified the following key char
 | Hypothesis | 14.51 | 0 | 71 | 13.00 | 9.00 | 18.00 |
 | Reasoning Chain | 164.54 | 4 | 921 | 153.00 | 125.00 | 191.00 |
 
-3. **Reflection Impact**: Approximately 30% of the dataset consists of examples with corrected reasoning through the Reflection-CoT mechanism. This substantial portion highlights the importance of our reflection process in creating a comprehensive training set that addresses challenging cases where the initial reasoning was flawed.
+3. **Reflection Impact**: Approximately 24.26% of the dataset consists of examples with corrected reasoning through the Reflection-CoT mechanism. This substantial portion highlights the importance of our reflection process in creating a comprehensive training set that addresses challenging cases where the initial reasoning was flawed.
 
 4. **Thought Quality Distribution**: Analysis of the reasoning chains indicates that most (approximately 65%) fall in the "medium length" category (101-200 tokens). This aligns with our prompt engineering focus on encouraging concise, structured reasoning.
 
@@ -278,7 +278,7 @@ Nevertheless, the observed pattern was consistent enough to inform our approach.
 
 ### LLM-As-A-Judge: Iterative Self-Critique & Improvement
 
-With improved thought generation in place, we still needed to address the approximately 30% of examples where our generated thoughts disagreed with dataset labels. Rather than simply discarding these examples, we explored an automated approach to improve them.
+With improved thought generation in place, we still needed to address the approximately 24.26% of examples where our generated thoughts disagreed with dataset labels. Rather than simply discarding these examples, we explored an automated approach to improve them.
 
 We developed an LLM-as-a-judge system (implemented in `scripts/score_thoughts.py`) that would:
 1. Score the quality of a generated thought process based on criteria such as coherence, correctness, and alignment with the label
@@ -575,7 +575,7 @@ These improvements suggest that our combined approach of CoT data augmentation a
 
 Our results demonstrate the significant improvements achieved through our Reflection-CoT data augmentation and QLoRA fine-tuning approach:
 
-1. **Classification improvement**: Our fine-tuned model achieved a dramatic improvement in accuracy, from 53.77% to 89.58%, representing a 35.81 percentage point (66.60% relative) improvement over the base Mistral-7B model. Even more striking is the F1 score improvement from 41.51% to 89.57% (+115.78% relative), indicating substantially better balanced performance.
+1. **Classification improvement**: Our fine-tuned model achieved a dramatic improvement in accuracy, from 53.77% to 89.58%, representing a 35.81 percentage point (66.60% relative) improvement over the base Mistral-7B model. Even more striking is the F1 score improvement from 41.51% to 89.57%, indicating substantially better balanced performance.
 
 2. **Reasoning quality enhancement**: Our analysis suggests improvements in medium-to-long reasoning chains (101-300 tokens), though the comparison is limited by methodological differences in datasets and baselines.
 
