@@ -11,3 +11,14 @@ logs/*
 !logs/reflections/.gitkeep
 !logs/score/.gitkeep
 .env
+
+# Ignore non-sample data files
+data/original_data/*.csv
+!data/original_data/sample.csv
+data/original_thoughts/*.json
+!data/original_thoughts/sample*.json
+data/reflected_thoughts/*.json
+!data/reflected_thoughts/sample*.json
+data/finetune/*.jsonl
+!data/finetune/sample*.jsonl
+data/scored_thoughts/*.json
