@@ -1,4 +1,4 @@
-# Mistral-Thinking-7B: Interpretable NLI with Augmented Chain-of-Thought Fine-Tuning with QLoRA
+# NLIstral-QLoRA-7B: Interpretable NLI with Augmented Chain-of-Thought Fine-Tuning
 
 This document provides instructions for evaluating NLI models on test datasets, whether you've trained your own models or downloaded pre-trained ones.
 
