@@ -47,11 +47,35 @@
     }
   },
   "models": {
-    "mistral-7b-nli": {
-      "accuracy": 95.2,
-      "precision": 94.8,
-      "recall": 93.5,
-      "f1_score": 94.1
+    "Base_Mistral-7B": {
+      "accuracy": 53.77,
+      "precision": 60.49,
+      "recall": 52.32,
+      "f1_score": 41.51
+    },
+    "Mistral-7B-Instruct": {
+      "accuracy": 76.0,
+      "precision": 89.7,
+      "recall": 57.2,
+      "f1_score": 69.8
+    },
+    "Ablation0_Best": {
+      "accuracy": 89.23,
+      "precision": 89.21,
+      "recall": 89.25,
+      "f1_score": 89.22
+    },
+    "Ablation1_Best": {
+      "accuracy": 89.58,
+      "precision": 89.57,
+      "recall": 89.58,
+      "f1_score": 89.57
+    },
+    "Ablation2_Best": {
+      "accuracy": 89.33,
+      "precision": 89.38,
+      "recall": 89.27,
+      "f1_score": 89.30
     }
   },
   "token_vs_accuracy": {
