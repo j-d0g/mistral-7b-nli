@@ -1,52 +1,98 @@
 # Mistral-7b Fine-Tuning for NLI with Chain-of-Thought
+## Project Overview
 
 This project focuses on fine-tuning the Mistral-7B language model for Natural Language Inference (NLI) tasks, specifically using Chain-of-Thought (CoT) reasoning to improve classification performance and interpretability.
 
-## Project Overview
-
 The primary objective is to instruction-tune Mistral-7B using a custom NLI dataset augmented with CoT reasoning. The trained model can accurately classify premise-hypothesis pairs as either entailment (1) or no-entailment (0), while providing interpretable reasoning.
 
-## Documentation
+## Repository Structure
 
-We provide comprehensive documentation for each stage of the project:
+```
+.
+├── Dockerfile                   # Docker configuration
+├── requirements.txt             
+├── DATA.md                      # Dataset documentation
+├── TRAINING.md                  # Training documentation
+├── EVALUATION.md                # Evaluation documentation
+├── BLOG.md                      # Experimental journey narrative
+├── REPORT.md                     # Research findings and methodology
+├── run_training.sh              # Training script via Docker
+├── run_inference.sh             # Inference script via Docker
+├── run_metrics.sh               # Compute Metrics script via Docker
 
-* [DATA.md](DATA.md) - Preparing and understanding the datasets
-* [TRAINING.md](TRAINING.md) - Fine-tuning the model
-* [EVALUATION.md](EVALUATION.md) - Evaluating model performance
+├── data/                        # Augmented Data Directory
+│   ├── original_data/           # Original CSV Data Files
+│   ├── original_thoughts/       # Augmented JSON thought files
+│   ├── reflected_thoughts/      # Reflected JSON thought files
+│   ├── finetune/                # Final JSONL finetuning data
+│   ├── download_data.py         # Dataset download from HF
+│   └── DATASET_CARD.md           # Dataset card documentation
 
-Each document includes both a Quick Start guide for getting up and running quickly, as well as a Deep Dive section with technical details.
+├── train/                       # Training components
+│   ├── train_sft.py             # Main training implementation
+│   ├── config_loader.py         # Configuration loading utility
+│   └── configs/                 # Training configurations
 
-## Documentation Guide
+├── evaluate/                    # Evaluation components
+│   └── sample_model.py          # Model sampling implementation
+
+├── scripts/                     # Data Augmentation & Preparation Scripts
+│   ├── generate_thoughts.py     # Generate CoT reasoning
+│   ├── generate_thoughts_reflected.py # Generate reflections
+│   ├── prepare_ft_data.py       # Prepare fine-tuning data
+│   └── analysis/                # Data analysis & visualization
+
+├── models/                      # Model storage
+│   ├── download_model.py        # Model download from HF
+    └── MODEL_CARD.md             # Model card documentation
+
+├── results/                     # Evaluation results storage
+│   └── download_results.py      # Benchmarks download from HF
+
+├── metrics/                     # Visualization outputs and metrics
+├── figures/                     # Diagrams and visualizations
+├── utils/                       # Utility functions and helpers
+├── logs/                        # Log files from training runs
+├── tests/                       # Test files for the project
+├── llm/                         # LLM interface utilities
+└── service/                     # API and service implementations
+```
+
+
+## Documentation Directions
 
 This repository is split into three parts:
 
-1. **[DATA.md](DATA.md)** - Synthetic Chain-of-Thought augmentation of NLI Dataset
-2. **[TRAINING.md](TRAINING.md)** - Model training and fine-tuning
-3. **[EVALUATION.md](EVALUATION.md)** - Model evaluation and inference
+1. **[DATA.md](DATA.md)** - Synthetic Chain-of-Thought augmentation of NLI Dataset.
+2. **[TRAINING.md](TRAINING.md)** - Quantized model fine-tuning with QLoRA.
+3. **[EVALUATION.md](EVALUATION.md)** - Model loading, inference and evaluation.
 
-These guides explain how to use the repository as a quickstart user and contain a deep dive should you be interested in the technical implementation.
+Each document includes both a Quick Start guide for getting up and running quickly, as well as a Deep Dive section with technical detail.
+The quick start sections give you the option to download datasets, models and run inference quickly, or to reproduce the results as I did 
+through each of the steps, from generating thoughts & reflections to training your own QLoRA adaptors.
 
 Additional documentation:
 
-* **README.md** - Project overview and setup instructions
-* **PAPER.md** - Academic research paper with methodology and results
-* **BLOG.md** - Chronological narrative of the experimental journey
+* **[README.md](README.md)** - Project overview and setup instructions.
+* **[REPORT.md](REPORT.md)** - Write-up on methodology and results.
+* **[BLOG.md](BLOG.md)** - Chronological brain-dump style narrative of the experimental journey.
+* **[DATASET_CARD.md](data/DATASET_CARD.md)** - Dataset card on HuggingFace.
+* **[MODEL_CARD.md](models/MODEL_CARD.md)** - Model card on HuggingFace.
+
 
 ### Key Directories
 
 * **data/** - Datasets and processing scripts
 * **train/** - Training implementation and configs
 * **evaluate/** - Inference and metrics code
-* **scripts/** - Supporting utilities for data processing and analysis
 * **results/** - Outputs from model evaluation
-* **metrics/** - Visualization outputs and performance metrics
 * **models/** - Storage for trained model checkpoints
 
 ### Recommended Reading Path
 
-* **First-time users:** Start with README.md, then follow the three core pillars in order (DATA → TRAINING → EVALUATION)
-* **Understanding results:** Start with EVALUATION.md, then explore PAPER.md for deeper analysis
-* **Understanding methodology:** Read BLOG.md for the narrative journey, then PAPER.md for formalized approach
+* **First-time users:** Start with **[README.md](README.md)**, then follow the three core pillars in order 
+(**[DATA.md](DATA.md)** → **[TRAINING.md](TRAINING.md)** → **[EVALUATION.md](EVALUATION.md)**)
+* **Understanding Research & Methodology:** Read **[REPORT.md](REPORT.md)** to follow a formal narrative, or start with **[BLOG.md](BLOG.md)** if you prefer an informal succinct read.
 
 ## Quick Start
 
@@ -63,19 +109,19 @@ To get started with the project:
    docker build -t mistral-nli-ft .
    ```
 
-3. **Download the datasets**:
+3. **Download the augmented datasets**:
    ```bash
    docker run --rm -v $(pwd):/app -w /app --env-file .env mistral-nli-ft python3 data/download_data.py
    ```
 
 4. **Train a model**:
    ```bash
-   ./run_training.sh --config train/configs/sample_test.py
+   ./run_training.sh --config train/configs/quick_test.py
    ```
 
 5. **Evaluate your model**:
    ```bash
-   ./run_inference.sh --model models/mistral-thinking-sample-test --data data/original_data/test.csv
+   ./run_inference.sh --model models/nlistral-ablation1 --data data/original_data/test.csv
    ```
 
 ## Docker Usage & Environment Setup
@@ -93,55 +139,8 @@ You can choose the appropriate approach based on which part of the pipeline you'
 python3 scripts/generate_thoughts.py --api mistral --input-csv data/original_data/train.csv --output-json data/original_thoughts/train_thoughts.json
 
 # For training and inference (Docker required)
-./run_training.sh --config train/configs/sample_test.py
-./run_inference.sh --model models/mistral-thinking-sample-test --data data/sample/demo.csv
-```
-
-## Repository Structure
-
-```
-.
-├── Dockerfile                   # Docker configuration
-├── requirements.txt             # Python dependencies
-├── DATA.md                      # Dataset documentation
-├── TRAINING.md                  # Training documentation
-├── EVALUATION.md                # Evaluation documentation
-├── BLOG.md                      # Experimental journey narrative
-├── HUB_MODEL.md                 # Model card documentation
-├── HUB_DATASET.md               # Dataset card documentation
-├── PAPER.md                     # Research findings and methodology
-├── prompts.py                   # Centralized prompt templates
-├── run_training.sh              # Script for running training
-├── run_inference.sh             # Script for running inference
-├── run_metrics.sh               # Script for parsing metrics from results
-├── data/                        # Dataset files and scripts
-│   ├── original_data/           # Original NLI datasets (CSV)
-│   ├── original_thoughts/       # Generated thought processes
-│   ├── reflected_thoughts/      # Improved reasoning for incorrect examples
-│   ├── finetune/                # Formatted training data (JSONL)
-│   └── download_data.py         # Dataset download script
-├── train/                       # Training components
-│   ├── train_sft.py             # Main training implementation
-│   ├── config_loader.py         # Configuration loading utility
-│   └── configs/                 # Training configurations
-├── evaluate/                    # Evaluation components
-│   └── sample_model.py          # Model sampling implementation
-├── scripts/                     # Data preparation scripts
-│   ├── generate_thoughts.py     # Generate CoT reasoning
-│   ├── generate_thoughts_reflected.py # Generate reflections
-│   ├── prepare_ft_data.py       # Prepare fine-tuning data
-│   └── analysis/                # Data analysis & visualization
-├── models/                      # Model storage
-│   └── download_model.py        # Model download script
-├── results/                     # Evaluation results storage
-├── metrics/                     # Visualization outputs and metrics
-├── figures/                     # Diagrams and visualizations
-├── utils/                       # Utility functions and helpers
-├── logs/                        # Log files from training runs
-├── tests/                       # Test files for the project
-├── wandb/                       # Weights & Biases logging data
-├── llm/                         # LLM interface utilities
-└── service/                     # API and service implementations
+./run_training.sh --config train/configs/quick_test.py
+./run_inference.sh --model models/nlistral-ablation1 --data data/original_data/sample.csv
 ```
 
 ## Project Highlights
@@ -158,12 +157,12 @@ python3 scripts/generate_thoughts.py --api mistral --input-csv data/original_dat
 - NVIDIA GPU with at least 16GB VRAM
 - Hugging Face account/token (for downloading datasets and models)
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Acknowledgments
 
 - The Mistral AI team for releasing the Mistral-7B model
 - Hugging Face for their transformers, PEFT, and TRL libraries
 - The Chain-of-Thought paper authors
+
+
+***Generative AI Disclaimer**: AI Tool(s) were used to aid in iterative development of this solution, as well as mass code refactoring, modularisation, visualizations and development & maintenance of documentation. Without the use of Generative AI as a tool, I would not have been able to have iterated through all the cycles of my solution in time given the constraints. Generative AI was not used to dictate or steer my solution, but rather steered with intent from my own ideas and research interests.*

@@ -20,6 +20,12 @@ This document provides instructions for training the Mistral-7B NLI model using 
 ---
 
 # Quick Start
+For a deeper dive on into the code & experimentation, see - [Deep Dive: Technical Details](#deep-dive-technical-tetails)
+.
+
+To skip straight to model training or inference, see **[EVALUATION.md](EVALUATION.md)**.
+
+For more methodology/results oriented details, check out the **[REPORT.md](REPORT.md)**.
 
 ## Prerequisites
 
@@ -147,7 +153,7 @@ If training crashes unexpectedly:
 To resume from a checkpoint after interruption:
 
 ```bash
-./run_training.sh --config train/configs/ablation1_best.py --resume_from_checkpoint models/mistral-thinking-ablation1-best/checkpoint-XXXX
+./run_training.sh --config train/configs/ablation1_best.py --resume_from_checkpoint models/nlistral-ablation1/checkpoint-XXXX
 ```
 
 Or to resume from the latest checkpoint:
@@ -166,7 +172,7 @@ To evaluate your trained model on a test dataset, see [EVALUATION.md](EVALUATION
 
 ```bash
 # Evaluate the model on the test dataset
-./run_inference.sh --model models/mistral-thinking-ablation1-best --data data/original_data/test.csv
+./run_inference.sh --model models/nlistral-ablation1 --data data/original_data/test.csv
 ```
 
 The evaluation script will generate detailed output files in the `results/` directory, including accuracy metrics and per-example predictions with thought processes.
@@ -234,7 +240,7 @@ Managing numerous experiments with varying hyperparameters (learning rate, batch
 model_id = "mistralai/Mistral-7B-v0.3"
 train_data = "data/finetune/train_ft.jsonl"
 eval_data = "data/finetune/dev_ft.jsonl"
-output_dir = "models/mistral-thinking-ablation1-best"
+output_dir = "models/nlistral-ablation1"
 
 # LoRA parameters
 lora_r = 16
@@ -359,3 +365,9 @@ The project includes several training ablations to explore different configurati
    - **ablation2_best.py**: Refined version with even lower learning rate (5e-5) and extended training (5 epochs)
 
 The ablation configurations are available in the `train/configs/` directory and can be specified with the `--config` parameter. 
+
+## Further Information
+
+- **Synthetic Data Augmentation**: See [DATA.md](DATA.md)
+- **Evaluation**: See [EVALUATION.md](EVALUATION.md) 
+- **Research Methodology**: See [REPORT.md](REPORT.md)

@@ -612,7 +612,7 @@ def main():
     if args.output_csv:
         try:
             predictions = [item['predicted_label'] for item in results]
-            predictions_df = pd.DataFrame({'predicted_label': predictions})
+            predictions_df = pd.DataFrame({'prediction': predictions})
             predictions_df.to_csv(args.output_csv, index=False, header=True)
             print(f"Predictions saved to CSV: {args.output_csv}")
         except Exception as e:

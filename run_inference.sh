@@ -4,15 +4,13 @@
 # This script replaces all the separate test_*.sh scripts
 
 # Fixed parameters
-BATCH_SIZE=16
+BATCH_SIZE=8
 MAX_LENGTH=512
 SAVE_EVERY=1
-# Always use Chain-of-Thought reasoning
-USE_COT=true
 
 # Default parameters that can be changed
 MODEL_PATH="models/mistral-7b-nli-cot"
-TEST_FILE="data/sample/demo.csv"
+TEST_FILE="data/original_data/sample.csv"
 GPU_ID=0
 
 # Parse command line arguments

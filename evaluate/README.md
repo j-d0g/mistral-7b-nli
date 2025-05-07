@@ -15,7 +15,7 @@ Basic usage:
 
 ```bash
 # From the project root:
-./run_inference.sh --model models/mistral-thinking-ablation1-best --data data/original_data/test.csv
+./run_inference.sh --model models/nlistral-ablation1 --data data/original_data/test.csv
 ```
 
 See the main [EVALUATION.md](../EVALUATION.md) for more options and detailed explanations. 

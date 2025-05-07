@@ -5,11 +5,9 @@ This directory stores trained model checkpoints and provides utilities for downl
 ## Content
 
 After training, this directory will contain subdirectories for each training run, such as:
-- `mistral-thinking-ablation0/` - Base ablation0 configuration
-- `mistral-thinking-ablation0-best/` - Optimized ablation0 configuration
-- `mistral-thinking-ablation1-best/` - Best overall model (ablation1 optimized)
-- `mistral-thinking-ablation2/` - Base ablation2 configuration 
-- `mistral-thinking-ablation2-best/` - Optimized ablation2 configuration
+- `nlistral-ablation0/` - Base ablation0 configuration
+- `nlistral-ablation1/` - Best overall model (ablation1 optimized)
+- `nlistral-ablation2/` - Base ablation2 configuration
 
 Each model directory contains:
 - Adapter weights (LoRA parameters)
@@ -27,7 +25,7 @@ To download a pre-trained model:
 
 ```bash
 # Download a specific model
-docker run --rm -v $(pwd):/app -w /app --env-file .env mistral-nli-ft python3 models/download_model.py --model mistral-thinking-ablation0
+docker run --rm -v $(pwd):/app -w /app --env-file .env mistral-nli-ft python3 models/download_model.py --model nlistral-ablation0
 ```
 
 For details on how to train your own models or use downloaded models for inference, refer to:
