@@ -22,3 +22,62 @@ data/reflected_thoughts/*.json
 data/finetune/*.jsonl
 !data/finetune/sample*.jsonl
 data/scored_thoughts/*.json
+
+# Ignore large data files
+data/finetune/train_*.jsonl
+data/finetune/dev_*.jsonl
+!data/finetune/sample_*.jsonl
+
+data/original_thoughts/train_*.json
+data/original_thoughts/dev_*.json
+!data/original_thoughts/sample_*.json
+
+data/reflected_thoughts/train_*.json
+data/reflected_thoughts/dev_*.json
+!data/reflected_thoughts/sample_*.json
+
+data/scored_thoughts/train_*.json
+data/scored_thoughts/dev_*.json
+!data/scored_thoughts/sample_*.json
+
+# Virtual environment
+venv/
+.env/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
