@@ -1,4 +1,4 @@
-# Data Preparation for NLI Fine-Tuning
+# Synthetic Data Augmentation for NLI Fine-Tuning
 
 This document provides instructions for preparing the datasets needed for fine-tuning the Mistral-7B model on NLI tasks, with both quick start guides and in-depth technical explanations.
 
@@ -136,7 +136,6 @@ If you prefer to use Docker, or are using the same machine as for training, the 
 In this stage, we add Chain-of-Thought reasoning to the original CSV examples. This involves prompting the Mistral API to generate step-by-step reasoning for each example.
 ```bash
 # Build Docker 
-§
 
 ```bash
 # Process training data (Docker version)
@@ -240,5 +239,6 @@ docker run --rm -v $(pwd):/app -w /app --env-file .env mistral-nli-ft python3 da
 
 ## Further Information
 
-- **Training process**: See [TRAINING.md](TRAINING.md)
+- **Training**: See [TRAINING.md](TRAINING.md)
 - **Evaluation**: See [EVALUATION.md](EVALUATION.md) 
+- **Research methodology**: See [REPORT.md](REPORT.md) 

@@ -6,17 +6,7 @@ This project focuses on fine-tuning the Mistral-7B language model for Natural La
 
 The primary objective is to instruction-tune Mistral-7B using a custom NLI dataset augmented with CoT reasoning. The trained model can accurately classify premise-hypothesis pairs as either entailment (1) or no-entailment (0), while providing interpretable reasoning.
 
-## Documentation
-
-We provide comprehensive documentation for each stage of the project:
-
-* [DATA.md](DATA.md) - Preparing and understanding the datasets
-* [TRAINING.md](TRAINING.md) - Fine-tuning the model
-* [EVALUATION.md](EVALUATION.md) - Evaluating model performance
-
-Each document includes both a Quick Start guide for getting up and running quickly, as well as a Deep Dive section with technical details.
-
-## Documentation Guide
+## Documentation Directions
 
 This repository is split into three parts:
 
@@ -24,13 +14,13 @@ This repository is split into three parts:
 2. **[TRAINING.md](TRAINING.md)** - Model training and fine-tuning
 3. **[EVALUATION.md](EVALUATION.md)** - Model evaluation and inference
 
-These guides explain how to use the repository as a quickstart user and contain a deep dive should you be interested in the technical implementation.
+Each document includes both a Quick Start guide for getting up and running quickly, as well as a Deep Dive section with technical details.
 
 Additional documentation:
 
-* **README.md** - Project overview and setup instructions
-* **PAPER.md** - Academic research paper with methodology and results
-* **BLOG.md** - Chronological narrative of the experimental journey
+* **[README.md](README.md)** - Project overview and setup instructions
+* **[REPORT.md](REPORT.md)** - Write-up on methodology and results
+* **[BLOG.md](BLOG.md)** - Chronological narrative of the experimental journey
 
 ### Key Directories
 
@@ -45,8 +35,8 @@ Additional documentation:
 ### Recommended Reading Path
 
 * **First-time users:** Start with README.md, then follow the three core pillars in order (DATA → TRAINING → EVALUATION)
-* **Understanding results:** Start with EVALUATION.md, then explore PAPER.md for deeper analysis
-* **Understanding methodology:** Read BLOG.md for the narrative journey, then PAPER.md for formalized approach
+* **Understanding results:** Start with EVALUATION.md, then explore REPORT.md for deeper analysis
+* **Understanding methodology:** Read BLOG.md for the narrative journey, then REPORT.md for formalized approach
 
 ## Quick Start
 
@@ -109,7 +99,7 @@ python3 scripts/generate_thoughts.py --api mistral --input-csv data/original_dat
 ├── BLOG.md                      # Experimental journey narrative
 ├── HUB_MODEL.md                 # Model card documentation
 ├── HUB_DATASET.md               # Dataset card documentation
-├── PAPER.md                     # Research findings and methodology
+├── REPORT.md                     # Research findings and methodology
 ├── prompts.py                   # Centralized prompt templates
 ├── run_training.sh              # Training wrapper script
 ├── run_inference.sh             # Inference wrapper script
@@ -167,3 +157,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - The Mistral AI team for releasing the Mistral-7B model
 - Hugging Face for their transformers, PEFT, and TRL libraries
 - The Chain-of-Thought paper authors
+
+*Generative AI Disclaimer: AI Tools were used to aid in iterative development of this solution, as well as mass code refactoring, modularisation, visualizations and development & maintenance of documentation. Without the use of Generative AI as a tool, I would not have been able to have iterated through all the cycles of my solution in time given the constraints. Generative AI was not used to dictate or steer my solution, but rather steered with intent from my own ideas and research interests.*

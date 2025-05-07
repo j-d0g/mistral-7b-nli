@@ -359,3 +359,9 @@ The project includes several training ablations to explore different configurati
    - **ablation2_best.py**: Refined version with even lower learning rate (5e-5) and extended training (5 epochs)
 
 The ablation configurations are available in the `train/configs/` directory and can be specified with the `--config` parameter. 
+
+## Further Information
+
+- **Synthetic Data Augmentation**: See [DATA.md](DATA.md)
+- **Evaluation**: See [EVALUATION.md](EVALUATION.md) 
+- **Research Methodology**: See [REPORT.md](REPORT.md) 

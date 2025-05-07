@@ -32,9 +32,9 @@ Before you begin evaluating models, ensure you have:
    ```bash
    docker build -t mistral-nli-ft .
    ```
-4. **Either a trained model or a downloaded model checkpoint**
+4. **Either a trained model using instructions in [TRAINING.md](TRAINING.md) or a downloaded model checkpoint**
 
-> **Note:** Unlike data preparation which can be run locally with Python, **Docker is required** for model evaluation due to the complex GPU dependencies, model quantization requirements, and compatibility needs. The `run_inference.sh` script is specifically designed to work within the Docker container environment to ensure consistent results across different hardware setups.
+> **Note:** Unlike the instructions in instructions in [DATA.md](DATA.md), which can be run locally with Python, **Docker is required** for model evaluation due to the complex GPU dependencies, model quantization requirements, and compatibility needs. The `run_inference.sh` script is specifically designed to work within the Docker container environment to ensure consistent results across different hardware setups.
 
 ## Evaluating a Model
 
@@ -79,23 +79,6 @@ After evaluation completes, you'll find these files in the `results/` directory:
    - Simplified format for quick review or submission
 
 The script also saves checkpoint files during processing (`results/checkpoint_[model_name]-[dataset_name]-[timestamp].json`), which can be useful for debugging or recovering from interruptions.
-
-## Common Issues
-
-### Out of Memory Errors
-
-If you encounter CUDA out of memory errors:
-
-1. Reduce the batch size (modify in script or run directly with `evaluate/sample_model.py --batch_size 8`)
-2. Ensure no other processes are using the GPU
-
-### Slow Inference
-
-To speed up inference:
-
-1. Try a different GPU with more memory or faster compute
-2. Check for issues with Docker GPU configuration
-3. Verify Flash Attention is working if supported
 
 ---
 
@@ -278,6 +261,6 @@ Several strategies are employed to maximize inference speed:
 
 ## Further Information
 
-- **Data preparation**: See [DATA.md](DATA.md)
+- **Synthetic Data Augmentation**: See [DATA.md](DATA.md)
 - **Training**: See [TRAINING.md](TRAINING.md)
-- **Research methodology**: See [PAPER.md](PAPER.md) 
+- **Research Methodology**: See [REPORT.md](REPORT.md) 
