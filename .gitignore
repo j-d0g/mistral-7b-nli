@@ -46,15 +46,6 @@ results/*.csv
 !results/sample_*.json
 !results/sample_*.csv
 
-# Ignore all image files
-*.png
-*.jpg
-*.jpeg
-*.gif
-*.webp
-# Keep README images if needed later
-!readme_images/*.png
-
 # Virtual environment
 venv/
 .env/
