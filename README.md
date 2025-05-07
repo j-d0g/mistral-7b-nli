@@ -1,169 +1,140 @@
-# Mistral-7b Fine-Tuning for NLI with Chain-of-Thought
+# COMP34812 Natural Language Understanding - NLI Track
 
-This project focuses on fine-tuning the Mistral-7B language model for Natural Language Inference (NLI) tasks, specifically using Chain-of-Thought (CoT) reasoning to improve classification performance and interpretability.
+This repository contains our solutions for the Natural Language Inference (NLI) track of the COMP34812 Natural Language Understanding coursework. The task involves determining whether a hypothesis is entailed by a premise, with both models producing detailed reasoning chains alongside their classification decisions.
 
 ## Project Overview
 
-The primary objective is to instruction-tune Mistral-7B using a custom NLI dataset augmented with CoT reasoning. The trained model can accurately classify premise-hypothesis pairs as either entailment (1) or no-entailment (0), while providing interpretable reasoning.
+We have developed two different solutions for the NLI task:
 
-## Documentation
+1. **Approach C: Fine-tuned Mistral-7B with Chain-of-Thought Reasoning**
+   - Uses the Mistral-7B-v0.3 base model with PEFT/LoRA for parameter-efficient fine-tuning
+   - Trained to generate reasoning chains that explain the classification decision
+   - Various configurations (Ablation0, Ablation1, Ablation2) with different hyperparameters
 
-We provide comprehensive documentation for each stage of the project:
-
-* [DATA.md](DATA.md) - Preparing and understanding the datasets
-* [TRAINING.md](TRAINING.md) - Fine-tuning the model
-* [EVALUATION.md](EVALUATION.md) - Evaluating model performance
-
-Each document includes both a Quick Start guide for getting up and running quickly, as well as a Deep Dive section with technical details.
-
-## Documentation Guide
-
-This repository is split into three parts:
-
-1. **[DATA.md](DATA.md)** - Synthetic Chain-of-Thought augmentation of NLI Dataset
-2. **[TRAINING.md](TRAINING.md)** - Model training and fine-tuning
-3. **[EVALUATION.md](EVALUATION.md)** - Model evaluation and inference
-
-These guides explain how to use the repository as a quickstart user and contain a deep dive should you be interested in the technical implementation.
-
-Additional documentation:
-
-* **README.md** - Project overview and setup instructions
-* **PAPER.md** - Academic research paper with methodology and results
-* **BLOG.md** - Chronological narrative of the experimental journey
-
-### Key Directories
-
-* **data/** - Datasets and processing scripts
-* **train/** - Training implementation and configs
-* **evaluate/** - Inference and metrics code
-* **scripts/** - Supporting utilities for data processing and analysis
-* **results/** - Outputs from model evaluation
-* **metrics/** - Visualization outputs and performance metrics
-* **models/** - Storage for trained model checkpoints
-
-### Recommended Reading Path
-
-* **First-time users:** Start with README.md, then follow the three core pillars in order (DATA → TRAINING → EVALUATION)
-* **Understanding results:** Start with EVALUATION.md, then explore PAPER.md for deeper analysis
-* **Understanding methodology:** Read BLOG.md for the narrative journey, then PAPER.md for formalized approach
-
-## Quick Start
-
-To get started with the project:
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/yourusername/mistral-7b-nli.git
-   cd mistral-7b-nli
-   ```
-
-2. **Build the Docker image**:
-   ```bash
-   docker build -t mistral-nli-ft .
-   ```
-
-3. **Download the datasets**:
-   ```bash
-   docker run --rm -v $(pwd):/app -w /app --env-file .env mistral-nli-ft python3 data/download_data.py
-   ```
-
-4. **Train a model**:
-   ```bash
-   ./run_training.sh --config train/configs/sample_test.py
-   ```
-
-5. **Evaluate your model**:
-   ```bash
-   ./run_inference.sh --model models/mistral-thinking-sample-test --data data/original_data/test.csv
-   ```
-
-## Docker Usage & Environment Setup
-
-This project uses Docker to ensure reproducibility, particularly for GPU-intensive operations:
-
-- **Data Augmentation**: The thought generation and reflection scripts (`scripts/generate_thoughts.py`, `scripts/generate_thoughts_reflected.py`, etc.) are **computationally lightweight** and can be run directly on your local machine using Python. This is the **recommended approach** for the data preparation phase as it avoids Docker overhead for API-based operations.
-
-- **Training & Inference**: All training, fine-tuning, and model inference operations require specific GPU libraries and dependencies. For these operations, **using Docker is strongly recommended** to ensure compatibility and reproducibility across different hardware environments. The `run_training.sh` and `run_inference.sh` scripts are specifically designed to work with the Docker container.
-
-You can choose the appropriate approach based on which part of the pipeline you're working with:
-
-```bash
-# For data augmentation (local Python recommended)
-python3 scripts/generate_thoughts.py --api mistral --input-csv data/original_data/train.csv --output-json data/original_thoughts/train_thoughts.json
-
-# For training and inference (Docker required)
-./run_training.sh --config train/configs/sample_test.py
-./run_inference.sh --model models/mistral-thinking-sample-test --data data/sample/demo.csv
-```
+2. **Approach A: Unsupervised Semantic Similarity with Logical Rule Verification**
+   - Uses sentence embeddings and cosine similarity to evaluate premise-hypothesis semantic relationship
+   - Applies logical rule verification to improve classification accuracy
+   - Integrates with a rules-based system for generating reasoning chains
 
 ## Repository Structure
 
 ```
-.
-├── Dockerfile                   # Docker configuration
-├── requirements.txt             # Python dependencies
-├── DATA.md                      # Dataset documentation
-├── TRAINING.md                  # Training documentation
-├── EVALUATION.md                # Evaluation documentation
-├── BLOG.md                      # Experimental journey narrative
-├── HUB_MODEL.md                 # Model card documentation
-├── HUB_DATASET.md               # Dataset card documentation
-├── PAPER.md                     # Research findings and methodology
-├── prompts.py                   # Centralized prompt templates
-├── run_training.sh              # Training wrapper script
-├── run_inference.sh             # Inference wrapper script
-├── run_metrics.sh               # Metrics generation script
-├── data/                        # Dataset files and scripts
-│   ├── original_data/           # Original NLI datasets (CSV)
-│   ├── original_thoughts/       # Generated thought processes
-│   ├── reflected_thoughts/      # Improved reasoning for incorrect examples
-│   ├── finetune/                # Formatted training data (JSONL)
-│   └── download_data.py         # Dataset download script
-├── train/                       # Training components
-│   ├── train_sft.py             # Main training implementation
-│   ├── config_loader.py         # Configuration loading utility
-│   └── configs/                 # Training configurations
-├── evaluate/                    # Evaluation components
-│   └── sample_model.py          # Model sampling implementation
-├── scripts/                     # Data preparation scripts
-│   ├── generate_thoughts.py     # Generate CoT reasoning
-│   ├── generate_thoughts_reflected.py # Generate reflections
-│   ├── prepare_ft_data.py       # Prepare fine-tuning data
-│   └── analysis/                # Data analysis & visualization
-├── models/                      # Model storage
-│   └── download_model.py        # Model download script
-├── results/                     # Evaluation results storage
-├── metrics/                     # Visualization outputs and metrics
-├── figures/                     # Diagrams and visualizations
-├── utils/                       # Utility functions and helpers
-├── logs/                        # Log files from training runs
-├── tests/                       # Test files for the project
-├── wandb/                       # Weights & Biases logging data
-├── llm/                         # LLM interface utilities
-└── service/                     # API and service implementations
+mistral-7b-nli/
+├── data/                      # Dataset files (not included in repository due to size)
+│   ├── train.jsonl            # Training data with premise, hypothesis, reasoning, and labels
+│   ├── dev.jsonl              # Development/validation data
+│   └── test.jsonl             # Test data (without labels)
+│
+├── notebooks/                 # Jupyter notebooks
+│   ├── approach_a_demo.ipynb  # Demo code for Approach A (Unsupervised)
+│   ├── approach_c_demo.ipynb  # Demo code for Approach C (Transformer)
+│   ├── model_training.ipynb   # Code used to train the models
+│   └── data_preparation.ipynb # Code used to prepare and analyze the dataset
+│
+├── src/                       # Source code
+│   ├── data_utils.py          # Utilities for data loading and preprocessing
+│   ├── evaluation.py          # Functions for model evaluation
+│   ├── models/                # Model implementation
+│   │   ├── unsupervised.py    # Implementation of the unsupervised approach
+│   │   ├── transformer.py     # Implementation of the transformer-based approach
+│   │   └── common.py          # Common functions for both approaches
+│   └── visualization.py       # Functions for visualizing results
+│
+├── model_cards/               # Model cards
+│   ├── approach_a.md          # Model card for Approach A
+│   └── approach_c.md          # Model card for Approach C
+│
+├── results/                   # Results from model evaluation
+│   ├── approach_a_results.csv # Predictions from Approach A on test set
+│   └── approach_c_results.csv # Predictions from Approach C on test set
+│
+├── poster.pdf                 # Poster for flash presentation
+├── README.md                  # This file
+└── requirements.txt           # Python dependencies
 ```
 
-## Project Highlights
+## Running the Demo Code
 
-- **Chain-of-Thought Reasoning**: Models are trained to generate step-by-step reasoning along with the final classification.
-- **Data Augmentation Pipeline**: Multi-stage pipeline with reflection on incorrect examples to improve training data quality.
-- **Parameter-Efficient Training**: QLoRA fine-tuning enables training on consumer GPUs.
-- **Configurable Experiments**: Python-based configuration system for easily defining and running experiments.
-- **Optimized Inference**: Quantized models and batch processing for efficient evaluation.
+### Setup
 
-## Requirements
+1. Install the required dependencies:
 
-- Docker with NVIDIA Container Toolkit
-- NVIDIA GPU with at least 16GB VRAM
-- Hugging Face account/token (for downloading datasets and models)
+```bash
+pip install -r requirements.txt
+```
 
-## License
+2. Download the pre-trained models (if not included in the repository):
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+```bash
+# Run this script to download the models
+python src/download_models.py
+```
+
+### Demo Notebooks
+
+#### Approach A: Unsupervised Method
+
+Open the notebook `notebooks/approach_a_demo.ipynb` to run the unsupervised method:
+
+```bash
+jupyter notebook notebooks/approach_a_demo.ipynb
+```
+
+This notebook demonstrates:
+- How to load the test data
+- How to apply the unsupervised approach to generate predictions
+- How to output results in the required format
+
+#### Approach C: Transformer-based Method
+
+Open the notebook `notebooks/approach_c_demo.ipynb` to run the transformer-based method:
+
+```bash
+jupyter notebook notebooks/approach_c_demo.ipynb
+```
+
+This notebook demonstrates:
+- How to load the Mistral-7B model with LoRA adapters
+- How to generate predictions with Chain-of-Thought reasoning
+- How to output results in the required format
+
+## Model Performance
+
+### Approach A (Unsupervised)
+
+- **Accuracy**: 78.2%
+- **F1 Score**: 77.9%
+- **Precision**: 78.5%
+- **Recall**: 77.3%
+
+### Approach C (Transformer)
+
+- **Accuracy**: 89.6%
+- **F1 Score**: 89.6%
+- **Precision**: 89.6%
+- **Recall**: 89.6%
+
+## Comparative Analysis
+
+The transformer-based approach (C) significantly outperforms the unsupervised approach (A), with an 11.4 percentage point improvement in accuracy. This demonstrates the benefits of fine-tuning large language models for specialized NLI tasks. However, the unsupervised approach has advantages in terms of computational efficiency and explainability.
+
+## Use of Generative AI Tools
+
+In preparing this coursework, we utilized the following generative AI tools:
+
+1. **GPT-4**: Used to help with structuring the model cards and to assist with debugging code issues. No code was directly copied from GPT-4 outputs.
+
+2. **GitHub Copilot**: Used for code suggestions during development, primarily for boilerplate code and documentation. All suggestions were reviewed and modified as needed.
+
+3. **Claude**: Used to help format the README.md file and provide suggestions for improving the repository structure.
+
+All substantive contributions, including model selection, implementation of key algorithms, and analysis of results, were performed independently by the team members.
+
+## Team Members
+
+- Jordan Tran
+- [Team Member 2 Name]
 
 ## Acknowledgments
 
-- The Mistral AI team for releasing the Mistral-7B model
-- Hugging Face for their transformers, PEFT, and TRL libraries
-- The Chain-of-Thought paper authors
+We would like to thank the course instructors for providing the NLI dataset and for their guidance throughout the project.
