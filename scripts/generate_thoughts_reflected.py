@@ -227,8 +227,8 @@ def parse_arguments():
     parser.add_argument('--input-thoughts-json', type=str, default='data/original_thoughts/sample_thoughts.json', help='Path to the input JSON Lines file containing initial thoughts. Defaults to sample_thoughts.json.')
     parser.add_argument('--output-reflection-json', type=str, default='data/reflected_thoughts/sample_reflections.json', help='Path to the output JSON Lines file where reflection results will be saved. Defaults to sample_reflections.json.')
     parser.add_argument('--failed-csv', type=str, help='Path to save details of examples that failed during reflection generation. If not specified, will be auto-generated.')
-    parser.add_argument('--api', type=str, choices=['mistral', 'deepseek'], required=True, help='Which API to use (mistral or deepseek).')
-    parser.add_argument('--model-name', type=str, required=True, help='Name of the model to use for reflection (e.g., open-mistral-7b, deepseek-coder).')
+    parser.add_argument('--api', type=str, default='mistral', choices=['mistral', 'deepseek'], help='Which API to use (mistral or deepseek).')
+    parser.add_argument('--model-name', type=str, default='open-mistral-nemo', help='Name of the model to use for reflection (e.g., open-mistral-7b, deepseek-coder).')
     parser.add_argument('--workers', type=int, default=1, help='Number of worker processes for parallel execution. Default is 1.')
     parser.add_argument('--max-retries', type=int, default=5, help='Maximum number of retries for LLM generation per example.')
     # Optional start/end index for large files
