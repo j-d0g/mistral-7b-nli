@@ -273,7 +273,7 @@ import numpy as np
 from transformers import AutoTokenizer
 
 # Load the dataset
-dataset = load_dataset("jd0g/Mistral-7B-NLI-Chain-of-Thought-Dataset")
+dataset = load_dataset("jd0g/nlistral-7b-dataset")
 
 # Print dataset structure
 print(f"Dataset structure: {dataset.keys()}")
