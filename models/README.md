@@ -6,10 +6,8 @@ This directory stores trained model checkpoints and provides utilities for downl
 
 After training, this directory will contain subdirectories for each training run, such as:
 - `nlistral-ablation0/` - Base ablation0 configuration
-- `nlistral-ablation0-best/` - Optimized ablation0 configuration
 - `nlistral-ablation1/` - Best overall model (ablation1 optimized)
-- `nlistral-ablation2/` - Base ablation2 configuration 
-- `nlistral-ablation2-best/` - Optimized ablation2 configuration
+- `nlistral-ablation2/` - Base ablation2 configuration
 
 Each model directory contains:
 - Adapter weights (LoRA parameters)
