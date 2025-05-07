@@ -11,8 +11,8 @@ The primary objective is to instruction-tune Mistral-7B using a custom NLI datas
 This repository is split into three parts:
 
 1. **[DATA.md](DATA.md)** - Synthetic Chain-of-Thought augmentation of NLI Dataset
-2. **[TRAINING.md](TRAINING.md)** - Model training and fine-tuning
-3. **[EVALUATION.md](EVALUATION.md)** - Model evaluation and inference
+2. **[TRAINING.md](TRAINING.md)** - Quantized model fine-tuning with QLoRA
+3. **[EVALUATION.md](EVALUATION.md)** - Model loading, inference and evaluation
 
 Each document includes both a Quick Start guide for getting up and running quickly, as well as a Deep Dive section with technical details.
 
@@ -21,6 +21,9 @@ Additional documentation:
 * **[README.md](README.md)** - Project overview and setup instructions
 * **[REPORT.md](REPORT.md)** - Write-up on methodology and results
 * **[BLOG.md](BLOG.md)** - Chronological narrative of the experimental journey
+* **[HUB_DATASET.md](HUB_DATASET.md)** - Dataset card on HuggingFace
+* **[HUB_MODEL.md](HUB_MODEL.md)** - Model card on HuggingFace
+
 
 ### Key Directories
 
@@ -34,9 +37,9 @@ Additional documentation:
 
 ### Recommended Reading Path
 
-* **First-time users:** Start with README.md, then follow the three core pillars in order (DATA → TRAINING → EVALUATION)
-* **Understanding results:** Start with EVALUATION.md, then explore REPORT.md for deeper analysis
-* **Understanding methodology:** Read BLOG.md for the narrative journey, then REPORT.md for formalized approach
+* **First-time users:** For replicating my results, start with README.md, then follow the three core pillars in order (**[DATA.md](DATA.md) → **[TRAINING.md](TRAINING.md)** → **[EVALUATION.md](EVALUATION.md)**)
+* **Understanding results:** Start with **[EVALUATION.md](EVALUATION.md)**, then explore **[REPORT.md](REPORT.md)** for deeper analysis
+* **Understanding methodology:** Read BLOG.md for the narrative journey, then **[REPORT.md](REPORT.md)** for formalized approach
 
 ## Quick Start
 
