@@ -40,6 +40,21 @@ data/scored_thoughts/train_*.json
 data/scored_thoughts/dev_*.json
 !data/scored_thoughts/sample_*.json
 
+# Ignore large result files
+results/*.json
+results/*.csv
+!results/sample_*.json
+!results/sample_*.csv
+
+# Ignore all image files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+# Keep README images if needed later
+!readme_images/*.png
+
 # Virtual environment
 venv/
 .env/
