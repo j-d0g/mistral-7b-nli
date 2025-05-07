@@ -22,18 +22,24 @@ This document provides instructions for preparing the datasets needed for fine-t
 ---
 
 # Quick Start
+For a deeper dive on into the code & experimentation, see - [Deep Dive: Data Preparation Pipeline](#deep-dive-data-preparation-pipeline)
+.
 
+To skip straight to model training or inference, see **[TRAINING.md](TRAINING.md)**, **[EVALUATION.md](EVALUATION.md)**.
+
+For more methodology/results oriented details, check out the **[REPORT.md](REPORT.md)**.
 ## Prerequisites
 
 Before you begin with the datasets, ensure you have:
-
-1. **Docker installed (Optional)** with NVIDIA Container Toolkit (for GPU support)
-2. **Built the Docker image (Optional)**:
+1. **Created a Hugging Face token** (store in `.env` file as `HF_TOKEN=your_token_here`)
+2. **Created a Mistral API Key** (store in `.env` file as `MISTRAL_API_KEY=your_token_here`)
+3. **Have Python >= 3.10** installed on your machine.
+4. **Built the Docker image if using Docker (Optional)**:
    ```bash
    docker build -t mistral-nli-ft .
    ```
-3. **Created a Hugging Face token** (store in `.env` file as `HF_TOKEN=your_token_here`)
-4. **Created a Mistral API Key** (store in `.env` file as `MISTRAL_API_KEY=your_token_here`)
+Note, while docker is not necessary to run the data augmentation pipeline, **[TRAINING.md](TRAINING.md)** and **[EVALUATION.md](EVALUATION.md)**
+are tailor written to follow by building the docker image for best results, due to the nature of dependency complexities running on remote GPU workstations.
 
 ## Downloading Pre-Generated Datasets
 

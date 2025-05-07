@@ -21,6 +21,12 @@ This document provides instructions for evaluating NLI models on test datasets, 
 ---
 
 # Quick Start
+For a deeper dive on into the code & experimentation, see - [Deep Dive: Evaluation Details](#deep-dive-evaluation-tetails)
+.
+
+To follow the data augmentation process or to train your own QLoRA adaptors, follow **[DATA.md](DATA.md)**, **[TRAINING.md](TRAINING.md)**.
+
+For more methodology/results oriented details, check out the **[REPORT.md](REPORT.md)**.
 
 ## Prerequisites
 
@@ -44,10 +50,10 @@ If you've already trained a model using the instructions in [TRAINING.md](TRAINI
 
 ```bash
 # Basic usage with default parameters
-./run_inference.sh --model models/mistral-thinking-ablation1-best --data data/original_data/test.csv
+./run_inference.sh --model models/nlistral-ablation1 --data data/original_data/test.csv
 
 # Specifying GPU to use
-./run_inference.sh --model models/mistral-thinking-ablation1-best --data data/original_data/test.csv --gpu 1
+./run_inference.sh --model models/nlistral-ablation1 --data data/original_data/test.csv --gpu 1
 ```
 
 ### Option 2: Evaluating a Downloaded Model
@@ -56,17 +62,17 @@ You can also download our pre-trained models and evaluate them:
 
 ```bash
 # First download a model (one-time operation)
-docker run --rm -v $(pwd):/app -w /app --env-file .env mistral-nli-ft python3 models/download_model.py --model mistral-thinking-ablation0
+docker run --rm -v $(pwd):/app -w /app --env-file .env mistral-nli-ft python3 models/download_model.py --model nlistral-ablation0
 
 # Then evaluate it
-./run_inference.sh --model models/mistral-thinking-ablation0 --data data/original_data/test.csv
+./run_inference.sh --model models/nlistral-ablation0 --data data/original_data/test.csv
 ```
 
 ## Understanding Results
 
 After evaluation completes, you'll find these files in the `results/` directory:
 
-1. **JSON file** (`results/[model_name]-[dataset_name]-[timestamp].json`): 
+1. **JSON file** (`results/[model_name]-[dataset_name]-[labelled|unlabelled].json`): 
    - Contains detailed information including:
      - Model configuration
      - Overall accuracy (if input data had labels)
@@ -74,11 +80,11 @@ After evaluation completes, you'll find these files in the `results/` directory:
      - Per-example results with premise, hypothesis, predicted label, and raw model output
    - Used for detailed analysis and debugging
 
-2. **CSV file** (`results/[model_name]-[dataset_name]-[timestamp].csv`):
-   - Contains just the `predicted_label` column with 0/1 values
+2. **CSV file** (`results/[model_name]-[dataset_name]-[labelled|unlabelled].csv`):
+   - Contains just the `prediction` column with 0/1 values
    - Simplified format for quick review or submission
 
-The script also saves checkpoint files during processing (`results/checkpoint_[model_name]-[dataset_name]-[timestamp].json`), which can be useful for debugging or recovering from interruptions.
+The script also saves checkpoint files during processing (`results/checkpoint_[model_name]-[dataset_name]-[labelled|unlabelled].json`), which can be useful for debugging or recovering from interruptions.
 
 ---
 
@@ -139,16 +145,16 @@ Here are more detailed examples of running inference:
 
 ```bash
 # Basic example with default model on test set
-./run_inference.sh --model models/mistral-thinking-ablation1-best --data data/original_data/test.csv
+./run_inference.sh --model models/nlistral-ablation1 --data data/original_data/test.csv
 
 # Using a specific GPU (e.g., second GPU in system)
-./run_inference.sh --model models/mistral-thinking-ablation1-best --data data/original_data/test.csv --gpu 1
+./run_inference.sh --model models/nlistral-ablation1 --data data/original_data/test.csv --gpu 1
 
 # Evaluating a specific checkpoint from training
-./run_inference.sh --model models/mistral-thinking-ablation1-best/checkpoint-500 --data data/original_data/test.csv
+./run_inference.sh --model models/nlistral-ablation1/checkpoint-500 --data data/original_data/test.csv
 
 # Running on unlabeled data (will not report accuracy)
-./run_inference.sh --model models/mistral-thinking-ablation1-best --data data/sample/unlabeled_examples.csv
+./run_inference.sh --model models/nlistral-ablation1 --data data/sample/unlabeled_examples.csv
 ```
 
 ## Output File Structure
@@ -159,21 +165,30 @@ Here's an example of the structure of the JSON output file (based on actual resu
 
 ```json
 {
-  "model": "models/mistral-thinking-ablation1-best",
-  "inference_time_seconds": 83.56,
-  "samples_per_second": 0.23,
+  "model": "models/nlistral-ablation1",
+  "inference_time_seconds": 8745.582508087158,
+  "samples_per_second": 0.2260569834166954,
+  "use_cot": true,
+  "accuracy": 0.8958017197774406,
+  "precision": 0.8956566494591938,
+  "recall": 0.8957555559198259,
+  "f1_score": 0.895702426342089,
   "results": [
     {
-      "premise": "Nearby is the new, architecturally inventive Supreme Court Building.",
-      "hypothesis": "The Supreme Court Building was built in the early 1980s.",
+      "premise": "EXECUTORY CONTRACT - A contract which has not been performed by all parties to it.",
+      "hypothesis": "They wanted a flexible contract.",
       "predicted_label": 1,
-      "output": "Premise: Nearby is the new, architecturally inventive Supreme Court Building.\nHypothesis: The Supreme Court Building was built in the early 1980s.\n\nUse chain of thought reasoning to determine if the hypothesis is entailed by the premise. Provide your reasoning and the final label (0 or 1) in JSON format: {\"thought_process\": \"...\", \"predicted_label\": ...}  {\"thought_process\": \"step 1: the premise describes the supreme court building as 'new', indicating it was built recently. step 2: the hypothesis suggests the building was built in the early 1980s, which is consistent with the premise's description of the building as 'new'. step 3: therefore, the hypothesis is entailed by the premise.\", \"predicted_label\": 1}"
+      "output": "Premise: EXECUTORY CONTRACT - A contract which has not been performed by all parties to it.\nHypothesis: They wanted a flexible contract.\n\nUse chain of thought reasoning to determine if the hypothesis is entailed by the premise. Provide your reasoning and the final label (0 or 1) in JSON format: {\"thought_process\": \"...\", \"predicted_label\": ...}  {\"thought_process\": \"step 1: an executory contract is one that has not been fully performed by all parties. this means that there are still obligations and duties to be met. step 2: the hypothesis suggests that 'they' wanted a flexible contract. a flexible contract is one that allows for changes or modifications to be made, often in response to unforeseen circumstances. step 3: it is reasonable to infer that 'they' might have wanted a flexible contract because of the unperformed nature of the executory contract. this would allow for adjustments to be made as the contract is being carried out, ensuring that the contract remains relevant and effective. step 4: the hypothesis is not directly stated in the premise, but it can be logically inferred based on the information provided.step 5: it is important to note that the hypothesis only applies to the specific context of the executory contract described in the premise. it does not necessarily mean that all executory contracts are desired to be flexible, but rather that in this particular case, the parties involved may have had that intention.\", \"predicted_label\": 1} ",
+      "true_label": 1,
+      "correct": true
     },
     {
-      "premise": "Two examples of palatial townhouses funded by pastel (blue dye) are the Hotel d'Assezat (Place d'Assezat), now home to an art gallery that includes 30 works by Bonnard, and the Hotel de Bernuy (1 Rue Gambetta).",
-      "hypothesis": "The art gallery has only ten works by Bonnard.",
-      "predicted_label": 0,
-      "output": "Premise: Two examples of palatial townhouses funded by pastel (blue dye) are the Hotel d'Assezat (Place d'Assezat), now home to an art gallery that includes 30 works by Bonnard, and the Hotel de Bernuy (1 Rue Gambetta).\nHypothesis: The art gallery has only ten works by Bonnard.\n\nUse chain of thought reasoning to determine if the hypothesis is entailed by the premise. Provide your reasoning and the final label (0 or 1) in JSON format: {\"thought_process\": \"...\", \"predicted_label\": ...}  {\"thought_process\": \"step 1: in the premise, it is mentioned that there are 30 works by bonnard in the art gallery located in the hotel d'assezat. this information is factual and consistent. step 2: the hypothesis states that there are only ten works by bonnard in the art gallery. this contradicts the information provided in the premise. step 3: based on the logical reasoning, the hypothesis cannot be inferred from the premise as it contradicts the factual information provided.\", \"predicted_label\": 0}"
+      "premise": "Joseph Nocera from Slate.",
+      "hypothesis": "Nocera is the chief editor at Slate.",
+      "predicted_label": 1,
+      "output": "Premise: Joseph Nocera from Slate.\nHypothesis: Nocera is the chief editor at Slate.\n\nUse chain of thought reasoning to determine if the hypothesis is entailed by the premise. Provide your reasoning and the final label (0 or 1) in JSON format: {\"thought_process\": \"...\", \"predicted_label\": ...}  {\"thought_process\": \"step 1: joseph nocera is identified as a writer for slate. step 2: in journalism, writers often have specific roles within their organizations. step 3: while the premise doesn't explicitly state nocera's role, it's reasonable to infer that he might have a more senior role, such as chief editor, given his status as a writer for slate. step 4: therefore, the hypothesis that nocera is the chief editor at slate is plausible and aligns with the information provided in the premise.\", \"predicted_label\": 1} ",
+      "true_label": 1,
+      "correct": true
     }
   ]
 }
@@ -186,7 +201,7 @@ Note that the model's output is stored in the `output` field, which contains the
 The CSV output is very simple and only contains the predicted labels:
 
 ```csv
-predicted_label
+prediction
 1
 0
 1
@@ -225,7 +240,7 @@ For more advanced parameters, you can run the underlying Python script directly:
 ```bash
 docker run --gpus device=0 --rm -v $(pwd):/app -w /app mistral-nli-ft \
     python evaluate/sample_model.py \
-    --model_id models/mistral-thinking-ablation1-best \
+    --model_id models/nlistral-ablation1 \
     --test_file data/original_data/test.csv \
     --batch_size 16 \
     --use_cot
@@ -239,7 +254,8 @@ The script processes examples in batches (default: 16 in `run_inference.sh`) to 
 - Model size and quantization
 - Length of input examples
 
-A batch size of 16-32 typically works well for 4-bit quantized models on GPUs with 24GB memory.
+A batch size of 16 typically works well for 4-bit quantized models on GPUs with 24GB memory, enabling for much faster
+inference of larger datasets.
 
 ## Performance Optimization
 
@@ -261,6 +277,12 @@ Several strategies are employed to maximize inference speed:
 
 ## Further Information
 
-- **Synthetic Data Augmentation**: See [DATA.md](DATA.md)
-- **Training**: See [TRAINING.md](TRAINING.md)
-- **Research Methodology**: See [REPORT.md](REPORT.md) 
+You've now completed the steps to running inference on quantized Mistral models with Chain-of-Thought QLoRA adaptors!
+To revisit earlier stages in the pipeline, see:
+- **Synthetic Data Augmentation**: [DATA.md](DATA.md)
+- **Training**: [TRAINING.md](TRAINING.md)
+
+For a hollistic research-oriented deep dive on the methodology, experiments and findings, check out:
+- **Research Methodology**: [REPORT.md](REPORT.md) 
+
+Otherwise, thanks for visiting this repository!
