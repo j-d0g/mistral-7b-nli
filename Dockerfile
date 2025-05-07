@@ -18,7 +18,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Add additional packages - explicitly include scikit-learn
-RUN pip install --no-cache-dir sentencepiece wandb scikit-learn pandas numpy scipy joblib threadpoolctl
+RUN pip install --no-cache-dir sentencepiece wandb scikit-learn pandas numpy scipy joblib threadpoolctl jupyter
 
 # Copy the rest of the application code
 COPY . .
