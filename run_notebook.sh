@@ -1,29 +1,22 @@
 #!/bin/bash
 
-# Script to start Jupyter Notebook server inside Docker with GPU access
+# Create a temp file to install Jupyter and then run the notebook server
+cat > run_jupyter_temp.sh << 'EOF'
+#!/bin/bash
+# Install Jupyter inside the container
+pip install jupyter
 
-# Build the Docker image if it doesn't exist (optional, you can comment this out if you already built it)
-# docker build -t mistral-nli-ft .
+# Start Jupyter Notebook server
+jupyter notebook --ip 0.0.0.0 --port 8888 --allow-root --no-browser
+EOF
 
-# Set default GPU to use
-GPU_ID=${1:-0}
+# Make it executable
+chmod +x run_jupyter_temp.sh
 
-echo "Starting Jupyter Notebook server in Docker with GPU $GPU_ID..."
-echo "Once the server starts, copy the URL with the token and open it in your browser."
-
-# Run Docker container with:
-# - GPU access
-# - Port 8888 exposed for Jupyter
-# - Current directory mounted as /app
-# - Environment variables from .env
-docker run --rm \
-  --gpus device=$GPU_ID \
+# Run your Docker container with the modified script
+docker run --gpus device=0 --rm -it \
   -p 8888:8888 \
   -v $(pwd):/app \
-  -v $(pwd)/hf_cache:/root/.cache/huggingface \
   -w /app \
-  --env-file .env \
   mistral-nli-ft \
-  jupyter notebook --ip 0.0.0.0 --no-browser --allow-root
-
-echo "Jupyter server stopped." 
+  /bin/bash -c "/app/run_jupyter_temp.sh"

@@ -20,6 +20,11 @@ To download the dataset from Hugging Face:
 python data/download_data.py
 ```
 
+```bash
+# From the project root directory:
+docker run --rm -v $(pwd):/app -w /app --env-file .env mistral-nli-ft python3 data/download_data.py
+```
+
 This will download all dataset files from the Hugging Face repository.
 
 ### Uploading the Dataset
@@ -30,9 +35,14 @@ To upload any changes to the dataset to Hugging Face:
 python data/upload_data.py
 ```
 
+```bash
+# From the project root directory:
+docker run --rm -v $(pwd):/app -w /app --env-file .env mistral-nli-ft python3 data/upload_data.py
+```
+
 This will upload all relevant data directories to the repository.
 
 ## Notes
 
-- The dataset is stored in the Hugging Face repository: `jd0g/Mistral-NLI-Thoughts`
+- The dataset is stored in the Hugging Face repository: `jd0g/nlistral-7b-dataset`
 - The upload and download scripts require a Hugging Face API token in `.env` file (HF_TOKEN) 
