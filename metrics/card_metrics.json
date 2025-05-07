@@ -1,17 +1,17 @@
 {
   "dataset": {
-    "train_examples": 37571,
-    "dev_examples": 1977,
-    "test_examples": 1974,
-    "total_examples": 41522,
-    "train_percentage": 90.48,
-    "dev_percentage": 4.76,
-    "test_percentage": 4.75,
+    "train_examples": 28051,
+    "dev_examples": 1558,
+    "test_examples": 1558,
+    "total_examples": 31167,
+    "train_percentage": 90.0,
+    "dev_percentage": 5.0,
+    "test_percentage": 5.0,
     "label_distribution": {
-      "entailment": 21429,
-      "no_entailment": 20093,
-      "entailment_percentage": 51.61,
-      "no_entailment_percentage": 48.39
+      "entailment": 16125,
+      "no_entailment": 15042,
+      "entailment_percentage": 51.74,
+      "no_entailment_percentage": 48.26
     }
   },
   "tokens": {
@@ -47,6 +47,7 @@
     }
   },
   "models": {
+    "_comment": "Model performance metrics based on the first 1558 examples in the test set",
     "Base_Mistral-7B": {
       "accuracy": 53.77,
       "precision": 60.49,
@@ -75,10 +76,11 @@
       "accuracy": 89.33,
       "precision": 89.38,
       "recall": 89.27,
-      "f1_score": 89.30
+      "f1_score": 89.3
     }
   },
   "token_vs_accuracy": {
+    "_comment": "Token length vs accuracy statistics from the filtered test set results",
     "ranges": [
       "0-100",
       "101-200",
@@ -86,16 +88,16 @@
       "301+"
     ],
     "accuracies": [
-      83.87096774193549,
-      90.12265978050355,
+      83.87,
+      90.12,
       92.4,
-      60.86956521739131
+      60.87
     ],
     "counts": [
-      155,
-      1549,
-      250,
-      23
+      122,
+      1220,
+      197,
+      19
     ]
   }
 }

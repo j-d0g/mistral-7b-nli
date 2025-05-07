@@ -432,25 +432,26 @@ We conducted several ablation studies to identify optimal training parameters:
 
 3. **Warmup Strategy:** We found that fixed `warmup_steps` (ranging from 50-150) provided better stability than ratio-based warmup, particularly when resuming training or adjusting training duration.
 
-The key hyperparameters for our best-performing configuration (Ablation2_Best) were:
+The key hyperparameters for our best-performing configuration (Ablation1_Best) were:
 
 | Parameter | Value | Notes |
 |-----------|-------|-------|
-| lora_r | 32 | Higher rank to capture complex reasoning patterns |
-| lora_alpha | 64 | Set to 2*r for proper scaling |
+| lora_r | 16 | Balanced rank for capturing reasoning patterns |
+| lora_alpha | 32 | Set to 2*r for proper scaling |
 | lora_dropout | 0.05 | Light regularization |
-| learning_rate | 5e-5 | Lower LR for larger batch stability |
-| per_device_train_batch_size | 8 | Hardware limitation |
-| gradient_accumulation_steps | 8 | For effective batch size of 64 |
-| warmup_steps | 100 | Fixed steps for stable warm-up |
-| max_steps | 5000 | Approximately 5 epochs |
-| eval_steps | 500 | Regular validation |
-| save_steps | 500 | Regular checkpointing |
+| learning_rate | 2e-4 | Higher LR for medium batch size |
+| per_device_train_batch_size | 4 | Hardware limitation |
+| gradient_accumulation_steps | 8 | For effective batch size of 32 |
+| warmup_steps | 50 | Fixed steps for stable warm-up |
+| max_steps | 2000 | Approximately 2 epochs |
+| eval_steps | 250 | Regular validation |
+| save_steps | 250 | Regular checkpointing |
 | gradient_checkpointing | True | Memory optimization |
-| gradient_clipping | 1.0 | Prevent exploding gradients |
 | bf16 | True | Memory efficiency |
 | optim | paged_adamw_8bit | Memory efficiency |
 | max_seq_length | 512 | Optimal for reasoning length |
+
+For comparison, our Ablation2 configuration explored a longer training duration with a larger effective batch size (64) and lower learning rate (5e-5), achieving slightly lower but still strong performance (89.33% accuracy).
 
 ## 5. Results
 
@@ -508,20 +509,20 @@ The training dynamics of our models revealed important patterns about the fine-t
 
 <div align="center">
   <img src="metrics/training_dynamics.png" alt="Training dynamics of model ablations" width="700"/>
-  <p><em>Figure 7: Training dynamics for different model configurations, showing validation loss and accuracy during fine-tuning. The extended training of Ablation2 (5 epochs) allowed for more complete optimization, while maintaining low validation loss indicates effective generalization without overfitting.</em></p>
+  <p><em>Figure 7: Training dynamics for different model configurations, showing validation loss and accuracy during fine-tuning. While Ablation1 achieved the highest overall accuracy, the extended training of Ablation2 (5 epochs) demonstrated interesting optimization characteristics, maintaining low validation loss without overfitting.</em></p>
 </div>
 
 Several key observations from the training process:
 
-1. **Convergence rate**: The smaller batch configurations (Ablation0, Ablation1) converged more rapidly in terms of training steps but showed higher variance in validation metrics, with more pronounced fluctuations in the loss curve.
+1. **Convergence rate**: The smaller batch configurations (Ablation0, Ablation1) converged more rapidly in terms of training steps, with Ablation1 reaching higher final accuracy despite showing some variance in validation metrics.
 
-2. **Loss stability**: Ablation2, with its lower learning rate (5e-5) and larger batch size (effective batch 64), demonstrated more stable loss curves with fewer oscillations, indicating more reliable gradient updates and a smoother optimization trajectory.
+2. **Loss stability**: Ablation2, with its lower learning rate (5e-5) and larger batch size (effective batch 64), demonstrated more stable loss curves with fewer oscillations, indicating more reliable gradient updates and a smoother optimization trajectory, though this stability did not translate to higher final accuracy than Ablation1.
 
 3. **Generalization**: Despite training for more epochs (5 epochs vs 2 epochs for others), Ablation2 maintained consistently decreasing validation loss without signs of overfitting, suggesting that the model continued to improve its reasoning capabilities over more update steps without memorizing the training data.
 
 4. **Initial performance**: All configurations showed substantial improvements within the first 1000 steps, achieving approximately 80-85% accuracy early in training, with more gradual refinements in the later stages of training.
 
-These dynamics support our hyperparameter choices and demonstrate that parameter-efficient fine-tuning with appropriately chosen learning rates and batch sizes can achieve high-quality results with relatively modest computational resources.
+These dynamics support our hyperparameter choices for Ablation1 as our best-performing model and demonstrate that parameter-efficient fine-tuning with appropriately chosen learning rates and batch sizes can achieve high-quality results with relatively modest computational resources.
 
 ### 5.3. Comparison to Default Prompting
 
