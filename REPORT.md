@@ -58,7 +58,10 @@ CoT prompting, by eliciting step-by-step reasoning, enhances model interpretabil
 #### Transformer Architectures for NLI
 NLI has often utilized encoder-based (e.g., BERT) or encoder-decoder architectures (e.g., T5), typically encoding premise and hypothesis jointly for direct classification. These models excel at classification but do not natively generate explanatory text.
 
-![Comparison of encoder-decoder and decoder-only architectures for NLI tasks. While encoder-decoder models excel at classification, decoder-only models like Mistral-7B naturally facilitate step-by-step reasoning generation.](figures/encoder-decoder.png)
+<div align="center">
+  <img src="figures/encoder-decoder.png" alt="Comparison of encoder-decoder and decoder-only architectures" width="500"/>
+  <p><em>Figure: Comparison of encoder-decoder and decoder-only architectures for NLI tasks. While encoder-decoder models excel at classification, decoder-only models like Mistral-7B naturally facilitate step-by-step reasoning generation.</em></p>
+</div>
 
 Our use of a decoder-only autoregressive model (Mistral-7B) for CoT-based NLI is justified by its ability to: (1) unify reasoning and classification in a single generative process; (2) produce flexible, structured outputs (e.g., JSON with CoT and label); (3) leverage pre-trained reasoning capabilities; and (4) integrate world knowledge via autoregressive generation. The causal attention mechanism, mathematically $\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}} + M\right)V$ (where $M$ is the causal mask), is fundamental to CoT, enforcing step-by-step reasoning.
 
@@ -75,7 +78,10 @@ Our system integrates a multi-stage data augmentation pipeline with parameter-ef
     *   The augmented dataset, rich with CoT examples, is used to fine-tune `mistralai/Mistral-7B-v0.3` using QLoRA. This method involves 4-bit quantization of the base model and training low-rank adapters, enabling efficient tuning on accessible hardware (e.g., single 24GB GPU) by updating only a small fraction of parameters.
     *   Key training aspects include optimized sequence length (512 tokens based on CoT analysis), batching, and learning rate schedules.
 
-![Complete architecture of the NLIstral-7B-QLoRA data generation and fine-tuning pipeline. The process begins with initial CoT generation, followed by error identification, reflection-based correction, and culminates in QLoRA fine-tuning.](metrics/data_pipeline.png)
+<div align="center">
+  <img src="metrics/data_pipeline.png" alt="Complete architecture of the NLIstral-7B-QLoRA data generation pipeline" width="700"/>
+  <p><em>Figure 1: Complete architecture of the NLIstral-7B-QLoRA data generation and fine-tuning pipeline. The process begins with initial CoT generation, followed by error identification, reflection-based correction, and culminates in QLoRA fine-tuning.</em></p>
+</div>
 
 ### Contributions
 
@@ -120,7 +126,10 @@ By training the model to generate reasoning paths that lead to specific labels, 
 
 This pre-label alignment is particularly valuable in cases where label subjectivity might otherwise lead to confusion or inconsistency in the model's learning process.
 
-![Benefits of Chain-of-Thought as pre-label alignment. The reasoning path constrains the solution space, enables verification of logical steps, and provides opportunities for targeted human intervention.](metrics/reasoning_benefits.png)
+<div align="center">
+  <img src="metrics/reasoning_benefits.png" alt="Benefits of Chain-of-Thought as pre-label alignment" width="700"/>
+  <p><em>Figure 2: Benefits of Chain-of-Thought as pre-label alignment. The reasoning path constrains the solution space, enables verification of logical steps, and provides opportunities for targeted human intervention.</em></p>
+</div>
 
 #### Reflection on Errors: The Reflection-CoT Mechanism
 
@@ -162,8 +171,10 @@ Based on our analysis of the final dataset, we identified the following key char
 
 2. **Token Length Analysis**: As shown in Figure 4, the statistical analysis of token lengths revealed:
 
-![Token count distribution showing the average lengths of premises, hypotheses, and reasoning chains in the dataset.](metrics/token_count_distribution.png)
-*Figure 4: Distribution of token counts across premises, hypotheses, and reasoning chains in the final dataset, highlighting the significantly longer nature of reasoning compared to input text.*
+<div align="center">
+  <img src="metrics/token_count_distribution.png" alt="Token count distribution" width="700"/>
+  <p><em>Figure 4: Distribution of token counts across premises, hypotheses, and reasoning chains in the final dataset, highlighting the significantly longer nature of reasoning compared to input text.</em></p>
+</div>
 
 | Component | Average Tokens | Min | Max | Median | 1st Quartile | 3rd Quartile |
 |-----------|----------------|-----|-----|--------|--------------|--------------|
@@ -177,8 +188,10 @@ Based on our analysis of the final dataset, we identified the following key char
 
 The dataset composition deliberately balances between preserving the model's natural reasoning patterns (from correct initial generations) and learning from corrected errors (via the Reflection-CoT mechanism), creating a rich training resource for interpretable NLI.
 
-![Dataset composition and statistics showing the distribution of examples across original and reflection-corrected categories, along with class balance between entailment and non-entailment examples.](metrics/dataset_statistics.png)
-*Figure 5: Composition of the final dataset showing distribution by data source (original vs. reflection-corrected) and label balance.*
+<div align="center">
+  <img src="metrics/dataset_statistics.png" alt="Dataset composition and statistics" width="700"/>
+  <p><em>Figure 5: Composition of the final dataset showing distribution by data source (original vs. reflection-corrected) and label balance.</em></p>
+</div>
 
 ### 2.2. Model Architecture & Fine-Tuning Strategy
 
@@ -206,8 +219,10 @@ The implementation of QLoRA follows the architecture described in Dettmers et al
 ![Diagram of QLoRA architecture showing quantized model weights with low-rank adaptation matrices.](figures/QLoRA.png)
 *Figure 2: QLoRA architecture combining 4-bit quantization of the base model weights with trainable low-rank adaptation matrices (A and B). This enables parameter-efficient fine-tuning by only updating a small fraction of the parameters while preserving the knowledge in the base model.*
 
-![Model architecture showing QLoRA's approach to parameter-efficient fine-tuning with 4-bit quantized base model weights and trainable low-rank adapters.](metrics/model_architecture.png)
-*Figure 3: Overall architecture of our fine-tuning approach, integrating QLoRA with the Mistral-7B model for the NLI task.*
+<div align="center">
+  <img src="metrics/QLoRA.png" alt="Model architecture showing QLoRA approach" width="700"/>
+  <p><em>Figure 3: Overall architecture of our fine-tuning approach, integrating QLoRA with the Mistral-7B model for the NLI task.</em></p>
+</div>
 
 ### 2.3. Training Environment and Hyperparameters
 
@@ -258,8 +273,10 @@ This pattern suggested a potential insight: concise, focused reasoning might be 
 
 To quantify this potential relationship, we conducted an analysis of reasoning chains from our initial data generation. As shown in Figure 6, the data suggested a correlation between token length and accuracy:
 
-![Relationship between thought token length and accuracy, showing apparent optimal performance in the 150-350 token range and declining performance with longer chains.](metrics/thought_length_vs_accuracy.png)
-*Figure 6: Analysis showing the observed relationship between token length and accuracy. The scatter plot indicates raw accuracy points, while the trend line shows an apparent inverse relationship between length and accuracy beyond a certain range. It's important to note that this correlation doesn't necessarily imply causation.*
+<div align="center">
+  <img src="metrics/thought_length_vs_accuracy.png" alt="Reasoning Chain Length vs. Accuracy" width="700"/>
+  <p><em>Figure 6: Analysis showing the observed relationship between token length and accuracy. The scatter plot indicates raw accuracy points, while the trend line shows an apparent inverse relationship between length and accuracy beyond a certain range. It's important to note that this correlation doesn't necessarily imply causation.</em></p>
+</div>
 
 The statistical breakdown showed:
 
@@ -315,7 +332,10 @@ This approach was superior to simply asking a model to generate reasoning for a 
 
 Manual inspection of a random sample of these reflections confirmed they effectively identified and corrected flaws in the original reasoning while maintaining consistency in style and approach.
 
-![The Reflection-CoT process showing how incorrect initial reasoning is analyzed and corrected by a stronger model to create high-quality training examples for fine-tuning.](metrics/reflection_process.png)
+<div align="center">
+  <img src="metrics/reflection_process.png" alt="The Reflection-CoT process" width="700"/>
+  <p><em>Figure 7: The Reflection-CoT process showing how incorrect initial reasoning is analyzed and corrected by a stronger model to create high-quality training examples for fine-tuning.</em></p>
+</div>
 
 ### Final Dataset Composition
 
@@ -325,7 +345,10 @@ Our final fine-tuning dataset combined:
 
 This approach effectively doubled our usable training data compared to our initial naive approach, improved class balance, and ensured coverage of the full spectrum of examples, including challenging edge cases.
 
-![Distribution of examples in the final dataset, showing balanced representation of entailment and non-entailment cases.](metrics/dataset_distribution.png)
+<div align="center">
+  <img src="metrics/dataset_distribution.png" alt="Distribution of examples in the final dataset" width="700"/>
+  <p><em>Figure: Distribution of examples in the final dataset, showing balanced representation of entailment and non-entailment cases.</em></p>
+</div>
 
 ## 4. Experiment II - Fine-Tuning with QLoRA
 
@@ -483,8 +506,10 @@ The Ablation1_Best model, with its medium batch size (32) and carefully tuned le
 
 The training dynamics of our models revealed important patterns about the fine-tuning process. As shown in Figure 7, the models exhibited different convergence behaviors based on their hyperparameter configurations:
 
-![Training dynamics of model ablations showing loss curves and evaluation metrics during fine-tuning. Ablation2 with larger batch size and more epochs shows more stable convergence.](metrics/training_dynamics.png)
-*Figure 7: Training dynamics for different model configurations, showing validation loss and accuracy during fine-tuning. The extended training of Ablation2 (5 epochs) allowed for more complete optimization, while maintaining low validation loss indicates effective generalization without overfitting.*
+<div align="center">
+  <img src="metrics/training_dynamics.png" alt="Training dynamics of model ablations" width="700"/>
+  <p><em>Figure 7: Training dynamics for different model configurations, showing validation loss and accuracy during fine-tuning. The extended training of Ablation2 (5 epochs) allowed for more complete optimization, while maintaining low validation loss indicates effective generalization without overfitting.</em></p>
+</div>
 
 Several key observations from the training process:
 
@@ -532,8 +557,10 @@ The comprehensive metrics for our models compared to both baselines are summariz
 
 The improvements are substantial across all metrics, with the most dramatic enhancement in F1 score (+115.78% relative improvement), indicating that our fine-tuned model not only achieves higher overall accuracy but also maintains much better balance in its predictions. The remarkable improvement in recall (+71.21% relative) demonstrates that our Reflection-CoT approach was particularly effective at addressing the baseline model's challenges in identifying correct classifications consistently.
 
-![Comprehensive performance comparison between baseline and fine-tuned models across key metrics, showing substantial improvements especially in recall and F1 score.](metrics/model_performance.png)
-*Figure: Performance comparison of our fine-tuned model against baselines, highlighting the dramatic improvements in balanced prediction capability, particularly in recall and F1 score.*
+<div align="center">
+  <img src="metrics/model_performance.png" alt="Model Performance Comparison" width="700"/>
+  <p><em>Figure: Performance comparison of our fine-tuned model against baselines, highlighting the dramatic improvements in balanced prediction capability, particularly in recall and F1 score.</em></p>
+</div>
 
 These results highlight the significant value added by our fine-tuning approach, especially when compared to the true zero-shot performance of the pretrained model. Even when compared to the carefully engineered Mistral-7B-Instruct approach, our fine-tuned model shows substantial gains in accuracy (+13.58 percentage points) and particularly in recall (+32.38 percentage points), while requiring no examples or special prompting.
 
@@ -608,8 +635,10 @@ Our analysis of performance by reasoning chain length revealed another form of b
 
 Further analysis of the relationship between token length and prediction type revealed an even more striking bias pattern: as reasoning chain length increases, models demonstrate a stronger tendency to predict "no-entailment" and a corresponding decrease in "entailment" predictions. This pattern is visualized in Figure 9:
 
-![Prediction distribution by token length showing increasing tendency toward no-entailment classifications as reasoning chains grow longer.](metrics/prediction_distribution.png)
-*Figure 9: Analysis of prediction distribution across token length ranges, demonstrating that longer reasoning chains correlate with higher rates of no-entailment predictions. This suggests that models may become more critical and hesitant to declare entailment as they generate more text, potentially overanalyzing the relationship between premise and hypothesis.*
+<div align="center">
+  <img src="metrics/prediction_distribution.png" alt="Prediction distribution by token length" width="700"/>
+  <p><em>Figure 9: Analysis of prediction distribution across token length ranges, demonstrating that longer reasoning chains correlate with higher rates of no-entailment predictions. This suggests that models may become more critical and hesitant to declare entailment as they generate more text, potentially overanalyzing the relationship between premise and hypothesis.</em></p>
+</div>
 
 This finding has significant implications for NLI systems and aligns with observations from experiments with other models (including DeepSeek and o1), where more sophisticated reasoning capabilities sometimes led to decreased performance on this dataset due to over-analysis. We hypothesize that as models generate longer chains of thought, they naturally explore more potential conflicts or edge cases, leading to a conservative bias that favors "no-entailment" classifications. This effect becomes more pronounced with models having stronger reasoning capabilities, creating a counter-intuitive situation where improved reasoning might actually work against alignment with certain dataset labels that were created under different reasoning paradigms.
 
