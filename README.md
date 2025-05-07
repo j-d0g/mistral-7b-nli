@@ -11,22 +11,29 @@ The primary objective is to instruction-tune Mistral-7B using a custom NLI datas
 .
 ├── Dockerfile                   # Docker configuration
 ├── requirements.txt             
-├── DATA.md                      # Dataset documentation
-├── TRAINING.md                  # Training documentation
-├── EVALUATION.md                # Evaluation documentation
+
+├── DATASET_CARD.md              # Dataset card
+├── MODEL_CARD.md                # Model card
+├── REPORT.md                    # Research Report & Method
+
+├── DATA.md                      # Dataset repository documentation
+├── TRAINING.md                  # Training repository documentation
+├── EVALUATION.md                # Evaluation repository documentation
+
 ├── BLOG.md                      # Experimental journey narrative
-├── REPORT.md                     # Research findings and methodology
 ├── run_training.sh              # Training script via Docker
 ├── run_inference.sh             # Inference script via Docker
 ├── run_metrics.sh               # Compute Metrics script via Docker
+├── run_notebook                 #              
+├── demo.ipynb                   # Demo code             
+
 
 ├── data/                        # Augmented Data Directory
 │   ├── original_data/           # Original CSV Data Files
 │   ├── original_thoughts/       # Augmented JSON thought files
 │   ├── reflected_thoughts/      # Reflected JSON thought files
 │   ├── finetune/                # Final JSONL finetuning data
-│   ├── download_data.py         # Dataset download from HF
-│   └── DATASET_CARD.md           # Dataset card documentation
+│   └── download_data.py         # Dataset download from HF
 
 ├── train/                       # Training components
 │   ├── train_sft.py             # Main training implementation
@@ -61,7 +68,7 @@ The primary objective is to instruction-tune Mistral-7B using a custom NLI datas
 
 ## Documentation Directions
 
-This repository is split into three parts:
+This project & repository can be broken down into three parts:
 
 1. **[DATA.md](DATA.md)** - Synthetic Chain-of-Thought augmentation of NLI Dataset.
 2. **[TRAINING.md](TRAINING.md)** - Quantized model fine-tuning with QLoRA.
@@ -71,13 +78,16 @@ Each document includes both a Quick Start guide for getting up and running quick
 The quick start sections give you the option to download datasets, models and run inference quickly, or to reproduce the results as I did 
 through each of the steps, from generating thoughts & reflections to training your own QLoRA adaptors.
 
+## Model & Dataset Cards
+
+* **[DATASET_CARD.md](data/DATASET_CARD.md)** - Dataset card on HuggingFace.
+* **[MODEL_CARD.md](models/MODEL_CARD.md)** - Model card on HuggingFace.
+
 Additional documentation:
 
 * **[README.md](README.md)** - Project overview and setup instructions.
 * **[REPORT.md](REPORT.md)** - Write-up on methodology and results.
 * **[BLOG.md](BLOG.md)** - Chronological brain-dump style narrative of the experimental journey.
-* **[DATASET_CARD.md](data/DATASET_CARD.md)** - Dataset card on HuggingFace.
-* **[MODEL_CARD.md](models/MODEL_CARD.md)** - Model card on HuggingFace.
 
 
 ### Key Directories

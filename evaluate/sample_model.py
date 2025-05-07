@@ -416,7 +416,7 @@ def run_inference(model, tokenizer, test_data, args):
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=512,
+                max_new_tokens=256,
                 do_sample=False,
                 num_beams=1,
                 temperature=1.0
