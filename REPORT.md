@@ -67,7 +67,7 @@ Our system integrates a multi-stage data augmentation pipeline with parameter-ef
 
 1.  **Multi-Stage Data Augmentation (The Reflection-CoT Pipeline):**
     *   **Stage 1: Initial CoT Generation:** All premise-hypothesis pairs are processed by `open-mistral-7b` to generate an initial CoT and predicted label. This captures the baseline reasoning tendencies of a Mistral-7B class model.
-    *   **Stage 2: Error Identification & Reflection Trigger:** Examples where the initial prediction from Stage 1 mismatches the dataset's ground-truth label are flagged (approx. 24.26% of cases).
+    *   **Stage 2: Error Identification & Reflection Trigger:** Examples where the initial prediction from Stage 1 mismatches the dataset's ground-truth label are flagged (approx. 24.32% of cases).
     *   **Stage 3: Reflection-CoT Generation:** For flagged examples, the `open-mistral-nemo` (12B parameter) model is employed. It receives the premise, hypothesis, the *true label*, and the *original flawed CoT from `open-mistral-7b`*. Its task is to analyze the prior error and generate a corrected CoT that leads to the true label. The use of a more powerful 12B model for reflection is crucial, as this meta-reasoning task (analyzing and correcting another model's complex reasoning) requires greater capacity than the initial CoT generation. This specific contextual input guides `open-mistral-nemo` to produce targeted corrections rather than entirely new, potentially unrelated reasoning paths.
     *   **Stage 4: Final Dataset Assembly:** The fine-tuning dataset is composed of (a) examples correctly processed in Stage 1, and (b) examples corrected through the Reflection-CoT mechanism in Stage 3. This ensures comprehensive coverage and high-quality reasoning paths for all original examples.
 
@@ -124,7 +124,7 @@ This pre-label alignment is particularly valuable in cases where label subjectiv
 
 #### Reflection on Errors: The Reflection-CoT Mechanism
 
-A core component of our methodology is the **Reflection-CoT mechanism**, designed to address instances where the initial CoT generation by `open-mistral-7b` yielded predictions inconsistent with the provided dataset labels (approximately 24.26% of cases, as noted in experiment logs, `BLOG.md`).
+A core component of our methodology is the **Reflection-CoT mechanism**, designed to address instances where the initial CoT generation by `open-mistral-7b` yielded predictions inconsistent with the provided dataset labels (approximately 24.32% of cases, as noted in experiment logs, `BLOG.md`).
 
 **Addressing Label Disagreement & Limitations of Automated Correction:** Initial explorations (detailed in experiment logs, `BLOG.md`) into resolving these disagreements by attempting to automatically guide the model towards the correct label without explicit instruction (i.e., "correct naturally" through iterative self-scoring with stronger models) proved both prohibitively expensive (estimated >£100 in API costs for a subset) and largely ineffective. Models often struggled to find coherent, natural reasoning paths to the target label, reinforcing concerns about dataset label subjectivity and the limitations of purely automated refinement in such scenarios.
 
@@ -158,7 +158,7 @@ This strategy aimed to leverage the strengths of both models and ensure the fine
 
 Based on our analysis of the final dataset, we identified the following key characteristics:
 
-1. **Size and Distribution**: The dataset consists of 39,546 total examples, with 35,597 training examples (90.01%), 1,977 validation examples (5.00%), and 1,972 test examples (4.99%). The distribution of labels is well-balanced, with 13,248 entailment examples (33.50%) and 26,298 no-entailment examples (66.50%).
+1. **Size and Distribution**: The dataset consists of 31,167 total examples, with 28,051 training examples (90.00%), 1,558 validation examples (5.00%), and 1,558 test examples (5.00%). The distribution of labels is well-balanced, with 16,125 entailment examples (51.74%) and 15,042 no-entailment examples (48.26%).
 
 2. **Token Length Analysis**: As shown in Figure 4, the statistical analysis of token lengths revealed:
 
@@ -171,7 +171,7 @@ Based on our analysis of the final dataset, we identified the following key char
 | Hypothesis | 14.51 | 0 | 71 | 13.00 | 9.00 | 18.00 |
 | Reasoning Chain | 164.54 | 4 | 921 | 153.00 | 125.00 | 191.00 |
 
-3. **Reflection Impact**: Approximately 24.26% of the dataset consists of examples with corrected reasoning through the Reflection-CoT mechanism. This substantial portion highlights the importance of our reflection process in creating a comprehensive training set that addresses challenging cases where the initial reasoning was flawed.
+3. **Reflection Impact**: Approximately 24.32% of the dataset consists of examples with corrected reasoning through the Reflection-CoT mechanism. This substantial portion highlights the importance of our reflection process in creating a comprehensive training set that addresses challenging cases where the initial reasoning was flawed.
 
 4. **Thought Quality Distribution**: Analysis of the reasoning chains indicates that most (approximately 65%) fall in the "medium length" category (101-200 tokens). This aligns with our prompt engineering focus on encouraging concise, structured reasoning.
 
@@ -256,29 +256,31 @@ This pattern suggested a potential insight: concise, focused reasoning might be 
 
 #### Quantitative Analysis of Reasoning Length vs. Accuracy
 
-To quantify this potential relationship, we conducted an analysis of 37,572 reasoning chains from our initial data generation. As shown in Figure 6, the data suggested a correlation between token length and accuracy:
+To quantify this potential relationship, we conducted an analysis of reasoning chains from our initial data generation. As shown in Figure 6, the data suggested a correlation between token length and accuracy:
 
 ![Relationship between thought token length and accuracy, showing apparent optimal performance in the 150-350 token range and declining performance with longer chains.](metrics/thought_length_vs_accuracy.png)
-*Figure 6: Analysis of 37,572 reasoning chains showing the observed relationship between token length and accuracy. The scatter plot indicates raw accuracy points, while the trend line shows an apparent inverse relationship between length and accuracy beyond a certain range. It's important to note that this correlation doesn't necessarily imply causation.*
+*Figure 6: Analysis showing the observed relationship between token length and accuracy. The scatter plot indicates raw accuracy points, while the trend line shows an apparent inverse relationship between length and accuracy beyond a certain range. It's important to note that this correlation doesn't necessarily imply causation.*
 
 The statistical breakdown showed:
 
 | Token Range | Examples | Accuracy | Key Characteristics |
 |-------------|----------|----------|---------------------|
-| 0-100 | 686 (1.83%) | 86.44% | Often too simplistic, missing nuance |
-| 101-200 | 24,232 (64.50%) | 80.14% | Apparent balance of reasoning steps |
-| 201-300 | 10,537 (28.05%) | 69.50% | Beginning to show reasoning drift |
-| 301+ | 2,117 (5.63%) | 57.16% | Potential overthinking, tangential reasoning |
+| 0-100 | 667 (2.25%) | 86.06% | Often too simplistic, missing nuance |
+| 101-200 | 19,603 (66.21%) | 79.34% | Apparent balance of reasoning steps |
+| 201-300 | 7,784 (26.29%) | 68.99% | Beginning to show reasoning drift |
+| 301+ | 1,553 (5.25%) | 56.79% | Potential overthinking, tangential reasoning |
 
-This analysis indicated a potential inflection point around 200-300 tokens, beyond which each additional 100 tokens corresponded to approximately a 10-12 percentage point drop in accuracy. The overall accuracy across all examples was 75.98%, but this varied considerably based on length.
+This analysis indicated a potential inflection point around 200-300 tokens, beyond which each additional 100 tokens corresponded to approximately a 10-12 percentage point drop in accuracy. The overall accuracy across all examples was 75.59%, but this varied considerably based on length.
+
+> Note: These statistics represent findings from our analysis of the initially generated thoughts, which informed our approach to training even though our current dataset is a subset of this original analysis dataset.
 
 It's important to note that while we observed this correlation consistently across experiments, we cannot definitively conclude a causal relationship. Other factors may influence both reasoning length and accuracy, such as example complexity, topic domain, or inherent ambiguity in the task. This area would benefit from further controlled research.
 
-Nevertheless, the observed pattern was consistent enough to inform our approach. Based on this analysis, we redesigned our prompts to encourage brevity and structure (typically a 3-step reasoning process). This change appeared to have a positive impact, improving the initial generation accuracy from around 65% to 73% without changing the underlying model. This insight would later inform our choice of `max_seq_length=512` for fine-tuning, creating efficiency gains while potentially supporting more effective reasoning patterns.
+Nevertheless, the observed pattern was consistent enough to inform our approach. Based on this analysis, we redesigned our prompts to encourage brevity and structure (typically a 3-step reasoning process). This change appeared to have a positive impact, improving the initial generation accuracy from around 65% to 75.68% without changing the underlying model. This insight would later inform our choice of `max_seq_length=512` for fine-tuning, creating efficiency gains while potentially supporting more effective reasoning patterns.
 
 ### LLM-As-A-Judge: Iterative Self-Critique & Improvement
 
-With improved thought generation in place, we still needed to address the approximately 24.26% of examples where our generated thoughts disagreed with dataset labels. Rather than simply discarding these examples, we explored an automated approach to improve them.
+With improved thought generation in place, we still needed to address the approximately 24.32% of examples where our generated thoughts disagreed with dataset labels. Rather than simply discarding these examples, we explored an automated approach to improve them.
 
 We developed an LLM-as-a-judge system (implemented in `scripts/score_thoughts.py`) that would:
 1. Score the quality of a generated thought process based on criteria such as coherence, correctness, and alignment with the label
@@ -456,10 +458,12 @@ For transparency, we include these results as a reference point, but all improve
 
 Analysis of the initially generated thoughts revealed a significant correlation between reasoning chain length and accuracy:
 
-- **Short thoughts (0-100 tokens)**: 86.44% accuracy (686 examples)
-- **Medium thoughts (101-200 tokens)**: 80.14% accuracy (24,232 examples)
-- **Long thoughts (201-300 tokens)**: 69.50% accuracy (10,537 examples)
-- **Very long thoughts (301+ tokens)**: 57.16% accuracy (2,117 examples)
+- **Short thoughts (0-100 tokens)**: 86.06% accuracy (667 examples)
+- **Medium thoughts (101-200 tokens)**: 79.34% accuracy (19,603 examples)
+- **Long thoughts (201-300 tokens)**: 68.99% accuracy (7,784 examples)
+- **Very long thoughts (301+ tokens)**: 56.79% accuracy (1,553 examples)
+
+> Note: These statistics represent findings from our analysis of the initially generated thoughts, which informed our approach to training even though our current dataset is a subset of this original analysis dataset.
 
 This pattern suggests that as reasoning chains become longer, the baseline model becomes more prone to errors, with accuracy declining precipitously for very long chains. This finding helped inform our fine-tuning approach, particularly our focus on concise reasoning.
 
@@ -528,11 +532,14 @@ The comprehensive metrics for our models compared to both baselines are summariz
 
 The improvements are substantial across all metrics, with the most dramatic enhancement in F1 score (+115.78% relative improvement), indicating that our fine-tuned model not only achieves higher overall accuracy but also maintains much better balance in its predictions. The remarkable improvement in recall (+71.21% relative) demonstrates that our Reflection-CoT approach was particularly effective at addressing the baseline model's challenges in identifying correct classifications consistently.
 
+![Comprehensive performance comparison between baseline and fine-tuned models across key metrics, showing substantial improvements especially in recall and F1 score.](metrics/model_performance.png)
+*Figure: Performance comparison of our fine-tuned model against baselines, highlighting the dramatic improvements in balanced prediction capability, particularly in recall and F1 score.*
+
 These results highlight the significant value added by our fine-tuning approach, especially when compared to the true zero-shot performance of the pretrained model. Even when compared to the carefully engineered Mistral-7B-Instruct approach, our fine-tuned model shows substantial gains in accuracy (+13.58 percentage points) and particularly in recall (+32.38 percentage points), while requiring no examples or special prompting.
 
 ### 5.4. Thought Quality Assessment
 
-Perhaps the most significant finding was the improvement in reasoning quality across different token length ranges in our fine-tuned model:
+Another interesting finding was the re-balancing and improvement of prediction quality across different token ranges length ranges in our fine-tuned model:
 
 - **Short thoughts (0-100 tokens)**: 83.87% accuracy (155 examples)
 - **Medium thoughts (101-200 tokens)**: 90.12% accuracy (1,549 examples)
@@ -543,15 +550,17 @@ When directly compared to the baseline model's performance across token length r
 
 | Token Range | Original Model Accuracy | Fine-tuned Model Accuracy | Improvement |
 |-------------|-------------------------|---------------------------|-------------|
-| 0-100 | 86.44% | 83.87% | -2.57% |
-| 101-200 | 80.14% | 90.12% | +9.98% |
-| 201-300 | 69.50% | 92.40% | +22.90% |
-| 301+ | 57.16% | 60.87% | +3.71% |
+| 0-100 | 86.06% | 83.87% | -2.19% |
+| 101-200 | 79.34% | 90.12% | +10.78% |
+| 201-300 | 68.99% | 92.40% | +23.41% |
+| 301+ | 56.79% | 60.87% | +4.08% |
 
-![Comparison of accuracy across token length ranges between original and fine-tuned models, showing substantial improvements in medium-to-long reasoning chains.](metrics/token_accuracy_comparison.png)
-*Figure 8: Direct comparison of original and fine-tuned model accuracy across token length ranges, showing the fine-tuned model's improved performance on medium-to-long chains (101-300 tokens) while maintaining reasonable accuracy on very short and very long chains.*
+<div align="center">
+  <img src="metrics/token_accuracy_comparison_combined.png" alt="Comparison of Token Length vs. Accuracy" width="800"/>
+  <p><em>Figure 8: Side-by-side comparison of original model (left) and fine-tuned model (right) accuracy across token length ranges. The visualization reveals a striking pattern where accuracy decreases with token length in the original model but remains high in the fine-tuned model, with the 201-300 token range showing the most dramatic improvement (+23.41%), increasing from 68.99% to 92.40%.</em></p>
+</div>
 
-This comparison reveals that our fine-tuning process produced the most dramatic improvements in the critical medium-to-long token ranges (101-300 tokens), which constitute the majority of examples (92.55%) in our dataset. The slight decrease in accuracy for very short chains (0-100 tokens) suggests the model may have developed a preference for more thorough reasoning over extremely concise explanations. The modest improvement in very long chains (301+ tokens) indicates that while our approach helped, extremely lengthy reasoning remains challenging.
+This comparison reveals that our fine-tuning process produced the most dramatic improvements in the critical medium-to-long token ranges (101-300 tokens), which constitute the majority of examples in our dataset. While the original model shows a clear trend of decreasing accuracy as token length increases (from 86.06% for short chains to 56.79% for the longest), the fine-tuned model maintains high accuracy across most token ranges and actually performs best in the 201-300 token range (92.40%). The slight decrease in accuracy for very short chains (0-100 tokens, -2.19%) suggests the model may have developed a preference for more thorough reasoning over extremely concise explanations. Despite significant improvement (+4.08%), the relatively lower performance on very long chains (301+ tokens, 60.87%) indicates that while our approach helped, extremely lengthy reasoning remains challenging even for the fine-tuned model.
 
 It's important to note that these results come with several methodological caveats:
 
@@ -741,7 +750,5 @@ Mistral AI. (2023). Mistral 7B. https://huggingface.co/mistralai/Mistral-7B-v0.1
 Wei, J., Wang, X., Schuurmans, D., Bosma, M., Ichter, B., Xia, F., ... & Zhou, D. (2022). Chain-of-thought prompting elicits reasoning in large language models. arXiv preprint arXiv:2201.11903.
 
 Wei, J., Tay, Y., Bommasani, R., Raffel, C., Zoph, B., Borgeaud, S., ... & Fedus, W. (2022). Emergent abilities of large language models. arXiv preprint arXiv:2206.07682.
-
-Let me know if you need any further formatting or additions!
 
 Code and the Reflection-CoT augmented dataset are available at our project repository.

@@ -32,7 +32,7 @@ We selected `mistralai/Mistral-7B-v0.3` based on several factors:
 Our first approach was naive in several ways:
 
 1. We used a pre-quantized GPTQ version of Mistral-7B with poorly configured hyperparameters.
-2. We created an overly simplistic dataset that only included examples where `open-mistral-7b` predictions already matched the dataset labels (approximately 65-70% of examples).
+2. We created an overly simplistic dataset that only included examples where `open-mistral-7b` predictions already matched the dataset labels (approximately 75.68% of examples).
 3. After filtering to balance label distribution, we trained on only about 10,000 examples.
 
 **Result:** The model overfit extremely quickly, often within a single epoch, and failed to generalize to more challenging examples. This highlighted the critical importance of data quality and diversity in CoT fine-tuning.
@@ -49,11 +49,11 @@ Specifically, we found:
 
 Manual inspection confirmed that shorter chains were typically "concise, simplistic, logical," while longer ones often exhibited "overthinking" and struggled with subjective examples.
 
-**Action:** We redesigned our prompts to explicitly encourage brevity and structure (typically a 3-step reasoning process). This simple change improved the initial generation accuracy from around 65% to 70-75% without changing the model.
+**Action:** We redesigned our prompts to explicitly encourage brevity and structure (typically a 3-step reasoning process). This simple change improved the initial generation accuracy from around 65% to 75.68% without changing the model.
 
 ### 3. Attempted Solution: LLM-As-A-Judge
 
-With improved thought generation, we still needed to address the approximately 30% of examples where our generated thoughts disagreed with dataset labels. Rather than discarding these examples, we explored an automated approach to improve them.
+With improved thought generation, we still needed to address the approximately 24.32% of examples where our generated thoughts disagreed with dataset labels. Rather than discarding these examples, we explored an automated approach to improve them.
 
 We developed an LLM-as-a-judge system that would:
 1. Score the quality of generated thought processes based on coherence, correctness, and alignment with the label
@@ -129,7 +129,7 @@ Reducing the maximum sequence length was a key optimization driven by both perfo
    - Requesting exactly 3 reasoning steps, based on analysis of successful examples
    - Making brevity a criterion in scoring and self-improvement prompts
    
-   This refinement itself improved initial thought generation accuracy from ~65% to 70-75%.
+   This refinement itself improved initial thought generation accuracy from ~65% to 75.68%.
 
 3. **Setting `max_seq_length=512`:** After generating the entire dataset with brevity-focused prompts, we confirmed no example exceeded 400 tokens. This allowed a safe reduction from the default 2048 to 512 tokens.
 
@@ -186,7 +186,7 @@ We chose Option 2 because:
 
 ### Navigating Label Disagreement
 
-The ~30% of examples where model predictions disagreed with dataset labels presented options:
+The ~24.32% of examples where model predictions disagreed with dataset labels presented options:
 
 1. **Keep Original:** Trust the model's reasoning despite disagreeing with the label.
 2. **Omit:** Discard these disagreeing examples entirely.

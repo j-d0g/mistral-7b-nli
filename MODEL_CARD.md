@@ -26,7 +26,7 @@ This model is a fine-tuned version of Mistral-7B-v0.3 for Natural Language Infer
 This model was developed to improve both classification accuracy and reasoning transparency for Natural Language Inference. It uses Parameter-Efficient Fine-Tuning (PEFT) with QLoRA to enhance Mistral-7B's performance on determining whether a hypothesis can be inferred from a premise. The model produces detailed reasoning chains explaining its decision-making process before providing a final classification.
 
 <div align="center">
-  <img src="../metrics/model_architecture.png" alt="Model Architecture" width="600"/>
+  <img src="metrics/model_architecture.png" alt="Model Architecture" width="600"/>
   <p><em>Figure 1: Overall architecture showing QLoRA's approach to parameter-efficient fine-tuning with 4-bit quantized base model weights and trainable low-rank adapters.</em></p>
 </div>
 
@@ -52,7 +52,7 @@ This model was developed to improve both classification accuracy and reasoning t
 The model was trained on a custom dataset of over 35,000 NLI examples with premise-hypothesis pairs and generated Chain-of-Thought reasoning. This training data was created through our novel Reflection-CoT pipeline:
 
 <div align="center">
-  <img src="../metrics/data_pipeline.png" alt="Data Pipeline" width="800"/>
+  <img src="metrics/data_pipeline.png" alt="Data Pipeline" width="800"/>
   <p><em>Figure 2: The Reflection-CoT pipeline for data augmentation, showing the process from initial CoT generation to error identification and reflection-based correction.</em></p>
 </div>
 
@@ -98,7 +98,7 @@ We conducted several ablation studies to identify optimal training parameters. T
 - **Total Training Time:** 50 hours across 25+ ablation studies
 
 <div align="center">
-  <img src="../metrics/training_dynamics.png" alt="Training Dynamics" width="700"/>
+  <img src="metrics/training_dynamics.png" alt="Training Dynamics" width="700"/>
   <p><em>Figure 3: Training dynamics for different model configurations, showing validation loss and accuracy during fine-tuning. Note how Ablation2, with its lower learning rate and larger batch size, demonstrates more stable convergence.</em></p>
 </div>
 
@@ -113,17 +113,6 @@ We conducted several ablation studies to identify optimal training parameters. T
 <!-- This should describe any evaluation data used (e.g., the development/validation set provided). -->
 
 The model was evaluated on a test set derived from our original development and training data, comprising approximately 1,972 examples (5% of the total dataset) with balanced label distribution.
-
-#### Metrics
-
-<!-- These are the evaluation metrics being used. -->
-
-Evaluation metrics included:
-- Accuracy
-- Precision
-- Recall
-- F1 Score
-- Reasoning quality (measured by token length vs. accuracy analysis)
 
 ### Results
 
@@ -150,18 +139,18 @@ When compared to baseline models:
 One of our most significant findings was the improvement in reasoning quality across different chain lengths:
 
 <div align="center">
-  <img src="../metrics/token_accuracy_comparison.png" alt="Comparison of Instruct vs Fine-tuned Model Accuracy by Token Length" width="700"/>
-  <p><em>Figure 4: Comparison of accuracy across token length ranges between original and fine-tuned models, showing substantial improvements in medium-to-long reasoning chains.</em></p>
+  <img src="metrics/token_accuracy_comparison_combined.png" alt="Comparison of Token Length vs. Accuracy" width="800"/>
+  <p><em>Figure 4: Side-by-side comparison of original model (left) and fine-tuned model (right) accuracy across token length ranges. The fine-tuned model shows significant improvements in medium-to-long reasoning chains (101-300 tokens), with a dramatic +23.41% improvement in the 201-300 token range where accuracy jumps from 68.99% to 92.40%.</em></p>
 </div>
 
 Our fine-tuned model showed remarkable improvements in handling medium-to-long reasoning chains (101-300 tokens):
 
 | Token Range | Mistral-7B-Instruct Accuracy | Fine-tuned Model Accuracy | Improvement |
 |-------------|-------------------------|---------------------------|-------------|
-| 0-100 | 86.44% | 83.87% | -2.57% |
-| 101-200 | 80.14% | 90.12% | +9.98% |
-| 201-300 | 69.50% | 92.40% | +22.90% |
-| 301+ | 57.16% | 60.87% | +3.71% |
+| 0-100 | 86.06% | 83.87% | -2.19% |
+| 101-200 | 79.34% | 90.12% | +10.78% |
+| 201-300 | 68.99% | 92.40% | +23.41% |
+| 301+ | 56.79% | 60.87% | +4.08% |
 
 These improvements demonstrate that our fine-tuning process successfully addressed the declining performance in longer reasoning chains that was present in the original model, with the most dramatic improvements in the critical 201-300 token range.
 
@@ -196,7 +185,7 @@ These improvements demonstrate that our fine-tuning process successfully address
 An important phenomenon observed during training relates to reasoning length and prediction tendencies:
 
 <div align="center">
-  <img src="../metrics/prediction_distribution.png" alt="Prediction Distribution by Token Length" width="700"/>
+  <img src="metrics/prediction_distribution.png" alt="Prediction Distribution by Token Length" width="700"/>
   <p><em>Figure 5: Analysis of prediction distribution across token length ranges, demonstrating that longer reasoning chains correlate with higher rates of no-entailment predictions.</em></p>
 </div>
 

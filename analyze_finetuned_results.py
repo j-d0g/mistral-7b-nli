@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Script to analyze the relationship between reasoning chain token length and accuracy
-in the original thoughts generated during data preparation.
+Script to analyze the relationship between token length and accuracy in the fine-tuned model's test results.
 """
 
 import os
@@ -10,7 +9,6 @@ import re
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import defaultdict
-import argparse
 
 # Set style for plots
 plt.style.use('ggplot')
@@ -27,25 +25,26 @@ def estimate_token_count(text):
     # Simple approximation: ~4 characters per token on average for English text
     return len(text) // 4
 
-def load_jsonl_file(file_path):
-    """Load data from a JSONL file (each line is a JSON object)."""
-    data = []
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                try:
-                    item = json.loads(line.strip())
-                    data.append(item)
-                except json.JSONDecodeError as e:
-                    print(f"Error parsing line in {file_path}: {e}")
-                    continue
-        return data
-    except Exception as e:
-        print(f"Error loading file {file_path}: {e}")
-        return []
+def extract_thought_process(output_text):
+    """Extract the thought process from the model output."""
+    if not output_text:
+        return ""
+        
+    # Try to find JSON in the output
+    json_match = re.search(r'\{.*"thought_process":\s*"(.*?)".*\}', output_text, re.DOTALL)
+    if json_match:
+        return json_match.group(1)
+    
+    # Look for other patterns that might contain the reasoning
+    reasoning_match = re.search(r'step 1:(.*?)(?:predicted_label|$)', output_text, re.DOTALL)
+    if reasoning_match:
+        return reasoning_match.group(1)
+    
+    # If all else fails, return the full output
+    return output_text
 
-def analyze_token_vs_accuracy(data):
-    """Analyze token length vs accuracy relationship."""
+def analyze_token_vs_accuracy(results):
+    """Analyze token length vs accuracy relationship in the fine-tuned model results."""
     # Define token ranges
     ranges = [
         (0, 100),     # 0-100 tokens
@@ -60,14 +59,10 @@ def analyze_token_vs_accuracy(data):
     range_totals = [0] * len(ranges)
     range_correct = [0] * len(ranges)
     
-    # Process each sample
-    for item in data:
-        # Extract thought process - might be under different field names in original thoughts
-        thought_process = ""
-        if "thought_process" in item:
-            thought_process = item["thought_process"]
-        elif "reasoning" in item:
-            thought_process = item["reasoning"]
+    # Process each result
+    for result in results:
+        # Extract thought process
+        thought_process = extract_thought_process(result.get("output", ""))
         
         # Calculate token count
         token_count = estimate_token_count(thought_process)
@@ -82,13 +77,7 @@ def analyze_token_vs_accuracy(data):
                 range_totals[i] += 1
                 
                 # Check if prediction was correct
-                correct = False
-                if "predicted_label" in item and "true_label" in item:
-                    correct = item["predicted_label"] == item["true_label"]
-                elif "correct" in item:
-                    correct = item["correct"]
-                
-                if correct:
+                if result.get("correct", False):
                     range_correct[i] += 1
                 break
     
@@ -140,7 +129,7 @@ def create_token_vs_accuracy_visualization(range_labels, accuracies, counts, out
         ax.text(i, accuracy-4, f'{accuracy:.1f}%', ha='center', va='center', fontsize=12, fontweight='bold')
     
     # Customize chart
-    ax.set_title('Reasoning Chain Length vs. Accuracy (Original Thoughts)', fontsize=16, pad=15)
+    ax.set_title('Reasoning Chain Length vs. Accuracy (Fine-tuned Model)', fontsize=16, pad=15)
     ax.set_xlabel('Token Range in Reasoning Chain', fontsize=12, labelpad=10)
     ax.set_ylabel('Accuracy (%)', fontsize=12)
     ax.set_xticks(range(len(range_labels)))
@@ -161,48 +150,36 @@ def create_token_vs_accuracy_visualization(range_labels, accuracies, counts, out
     return output_path
 
 def main():
-    parser = argparse.ArgumentParser(description='Analyze token length vs accuracy in original thoughts.')
-    parser.add_argument('--train-file', type=str, default='data/original_thoughts/train_thoughts.json', 
-                        help='Path to the training thoughts JSONL file')
-    parser.add_argument('--dev-file', type=str, default='data/original_thoughts/dev_thoughts.json', 
-                        help='Path to the dev thoughts JSONL file')
-    parser.add_argument('--output-dir', type=str, default='metrics', 
-                        help='Directory to save output files')
-    parser.add_argument('--output-file', type=str, default='original_token_vs_accuracy.png', 
-                        help='Name of the output visualization file')
+    # Load test results
+    results_file = 'results/nlistral-ablation1-test-labelled.json'
+    output_dir = 'metrics'
+    output_file = 'token_vs_accuracy.png'
     
-    args = parser.parse_args()
+    print(f"Loading fine-tuned model results from {results_file}...")
+    with open(results_file, 'r', encoding='utf-8') as f:
+        data = json.load(f)
     
-    # Ensure output directory exists
-    os.makedirs(args.output_dir, exist_ok=True)
+    # Make sure 'results' key exists
+    if 'results' not in data:
+        print(f"Error: 'results' key not found in {results_file}")
+        return
     
-    # Load training thoughts
-    print(f"Loading training thoughts from {args.train_file}...")
-    train_data = load_jsonl_file(args.train_file)
-    print(f"Loaded {len(train_data)} training examples")
-    
-    # Load dev thoughts
-    print(f"Loading dev thoughts from {args.dev_file}...")
-    dev_data = load_jsonl_file(args.dev_file)
-    print(f"Loaded {len(dev_data)} dev examples")
-    
-    # Merge data
-    merged_data = train_data + dev_data
-    print(f"Merged data contains {len(merged_data)} examples")
+    results = data['results']
+    print(f"Loaded {len(results)} test examples")
     
     # Analyze token length vs accuracy
     print("Analyzing token length vs accuracy relationship...")
-    range_labels, accuracies, counts = analyze_token_vs_accuracy(merged_data)
+    range_labels, accuracies, counts = analyze_token_vs_accuracy(results)
     
     # Create output path
-    output_path = os.path.join(args.output_dir, args.output_file)
+    output_path = os.path.join(output_dir, output_file)
     
     # Print summary
-    print("\n===== Original Thoughts: Token Length vs Accuracy =====")
-    total_correct = sum([counts[i] * (accuracies[i]/100) for i in range(len(counts))])
+    print("\n===== Fine-tuned Model: Token Length vs Accuracy =====")
+    correct_sum = sum(counts[i] * (accuracies[i]/100) for i in range(len(counts)))
     total_examples = sum(counts)
-    overall_accuracy = (total_correct / total_examples * 100) if total_examples > 0 else 0
-    print(f"Overall accuracy: {overall_accuracy:.2f}% ({int(total_correct)}/{total_examples})")
+    overall_accuracy = (correct_sum / total_examples * 100) if total_examples > 0 else 0
+    print(f"Overall accuracy: {overall_accuracy:.2f}% ({int(correct_sum)}/{total_examples})")
     
     for i, (label, accuracy, count) in enumerate(zip(range_labels, accuracies, counts)):
         print(f"{label} tokens: {accuracy:.2f}% accuracy ({count} examples)")
@@ -211,7 +188,7 @@ def main():
     create_token_vs_accuracy_visualization(range_labels, accuracies, counts, output_path)
     
     # Save data to json for reference
-    data_output_path = os.path.join(args.output_dir, "original_token_vs_accuracy.json")
+    data_output_path = os.path.join(output_dir, "finetuned_token_vs_accuracy.json")
     with open(data_output_path, 'w', encoding='utf-8') as f:
         json.dump({
             "ranges": range_labels,

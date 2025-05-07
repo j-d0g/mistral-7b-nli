@@ -7,7 +7,7 @@ license: apache-2.0
 # Mistral-7B NLI Chain-of-Thought Dataset
 
 <div align="center">
-  <img src="../metrics/dataset_banner.png" alt="NLI Dataset Banner" width="600"/>
+  <img src="metrics/dataset_banner.png" alt="NLI Dataset Banner" width="600"/>
 </div>
 
 ## Dataset Description
@@ -18,7 +18,7 @@ This dataset was created as part of the COMP34812 Natural Language Understanding
 
 - **Task Type**: Natural Language Inference with Chain-of-Thought Reasoning
 - **Languages**: English
-- **Size**: 39,546 examples
+- **Size**: 31,167 examples
 - **Format**: JSONL with premise, hypothesis, reasoning chain, and label
 - **License**: Apache 2.0
 - **Assignment Context**: Developed for COMP34812 at The University of Manchester
@@ -32,7 +32,7 @@ The dataset was created from a collection of premise-hypothesis pairs with binar
 ### Data Collection and Augmentation Pipeline
 
 <div align="center">
-  <img src="../metrics/data_pipeline.png" alt="Data Pipeline" width="800"/>
+  <img src="metrics/data_pipeline.png" alt="Data Pipeline" width="800"/>
   <p><em>Figure 1: The Reflection-CoT data generation pipeline, showing the process of creating augmented training data through multiple stages.</em></p>
 </div>
 
@@ -47,11 +47,13 @@ The dataset creation involved three key phases:
 
 #### 1. Base Data Preparation
 
-The original dataset was split into training (90.01%), validation (5.00%), and test (4.99%) sets with balanced label distribution:
+The original dataset was split into training (90.00%), validation (5.00%), and test (5.00%) sets with balanced label distribution:
 
-- **Training set**: 35,597 examples used for fine-tuning
-- **Validation set**: 1,977 examples used for hyperparameter tuning
-- **Test set**: 1,972 examples reserved for final evaluation before submission to hidden test set.
+- **Training set**: 28,051 examples used for fine-tuning
+- **Validation set**: 1,558 examples used for hyperparameter tuning
+- **Test set**: 1,558 examples reserved for final evaluation before submission to hidden test set.
+
+Due to the thorough ablation studies, my results become heavily coupled with the validation set. Thus I propose to validate my final performance on a held-out test set before submission.
 
 #### 2. Initial Thought Generation
 
@@ -67,11 +69,11 @@ This step resulted in detailed reasoning chains that break down the inference pr
 #### 3. Reflection-CoT Generation
 
 <div align="center">
-  <img src="../metrics/reflection_process.png" alt="Reflection Process" width="700"/>
+  <img src="metrics/reflection_process.png" alt="Reflection Process" width="700"/>
   <p><em>Figure 2: The Reflection-CoT process showing how incorrect initial reasoning is analyzed and corrected by a stronger model.</em></p>
 </div>
 
-To enhance reasoning quality, we implemented a novel reflection mechanism for the remaining 24.26% of examples where the initial prediction was incorrect:
+To enhance reasoning quality, we implemented a novel reflection mechanism for the remaining 24.32% of examples where the initial prediction was incorrect:
 
 1. For examples where Mistral-7B's prediction mismatched the dataset's ground-truth label, we identified the original flawed reasoning
 2. A stronger model (Mistral-Nemo-12B) was provided with:
@@ -123,29 +125,29 @@ The final dataset underwent several processing steps:
 ### Dataset Statistics
 
 <div align="center">
-  <img src="../metrics/dataset_statistics.png" alt="Dataset Statistics" width="600"/>
+  <img src="metrics/dataset_statistics.png" alt="Dataset Statistics" width="600"/>
   <p><em>Figure 3: Composition of the dataset showing distribution by data source (original vs. reflection-corrected) and label balance.</em></p>
 </div>
 
 | Metric | Value |
 |--------|-------|
-| Total Examples | 39,546 |
-| Training Set | 35,597 (90.01%) |
-| Validation Set | 1,977 (5.00%) |
-| Test Set | 1,972 (4.99%) |
-| Entailment Examples | 13,248 (33.50%) |
-| Non-entailment Examples | 26,298 (66.50%) |
-| Reflection-Corrected Examples | 9,597 (24.26%) |
+| Total Examples | 31,167 |
+| Training Set | 28,051 (90.00%) |
+| Validation Set | 1,558 (5.00%) |
+| Test Set | 1,558 (5.00%) |
+| Entailment Examples | 16,125 (51.74%) |
+| Non-entailment Examples | 15,042 (48.26%) |
+| Reflection-Corrected Examples | 6,823 (24.32%) |
 
 ### Token Length Analysis
 
 <div align="center">
-  <img src="../metrics/token_count_distribution.png" alt="Token Count Distribution" width="700"/>
+  <img src="metrics/token_count_distribution.png" alt="Token Count Distribution" width="700"/>
   <p><em>Figure 4: Distribution of token counts across premises, hypotheses, and reasoning chains in the dataset.</em></p>
 </div>
 
 <div align="center">
-  <img src="../metrics/token_lengths.png" alt="Token Lengths" width="700"/>
+  <img src="metrics/token_lengths.png" alt="Token Lengths" width="700"/>
   <p><em>Figure 5: Box plot showing the distribution of token lengths for different components of the dataset.</em></p>
 </div>
 
@@ -162,15 +164,15 @@ This analysis shows that reasoning chains are significantly longer than premises
 One of the most important findings in our dataset analysis was the relationship between reasoning chain length and accuracy:
 
 <div align="center">
-  <img src="../metrics/original_token_vs_accuracy.png" alt="Original Thoughts Token Length vs Accuracy" width="700"/>
-  <p><em>Figure 6: Relationship between reasoning chain length and accuracy in the initial generated thoughts, showing declining performance with longer chains.</em></p>
+  <img src="metrics/original_token_vs_accuracy.png" alt="Original Thoughts Token Length vs Accuracy" width="700"/>
+  <p><em>Figure 6: Analysis of token length versus accuracy in the original thought generation phase, showing the declining performance as reasoning chains grow longer. The visualization reveals a consistent pattern: short chains (0-100 tokens) achieve 86.06% accuracy, medium chains (101-200 tokens) 79.34%, long chains (201-300 tokens) 68.99%, and very long chains (301+ tokens) only 56.79%.</em></p>
 </div>
 
 The data shows a clear trend:
-- Short thoughts (0-100 tokens): 86.44% accuracy (686 examples)
-- Medium thoughts (101-200 tokens): 80.14% accuracy (24,232 examples) 
-- Long thoughts (201-300 tokens): 69.50% accuracy (10,537 examples)
-- Very long thoughts (301+ tokens): 57.16% accuracy (2,117 examples)
+- Short thoughts (0-100 tokens): 86.06% accuracy (667 examples)
+- Medium thoughts (101-200 tokens): 79.34% accuracy (19,603 examples) 
+- Long thoughts (201-300 tokens): 68.99% accuracy (7,784 examples)
+- Very long thoughts (301+ tokens): 56.79% accuracy (1,553 examples)
 
 This finding suggests that as reasoning chains become longer, they become more prone to errors, making this an important consideration for both training and inference. This insight guided our approach to fine-tuning and explains why our model shows the most significant improvements in medium-to-long reasoning chains.
 
@@ -186,6 +188,31 @@ The dataset and resulting models were evaluated using:
 | F1 Score | Harmonic mean of precision and recall |
 | Thought Quality | Manual evaluation of reasoning coherence (1-5 scale) |
 | Token Length Analysis | Performance analysis across different reasoning chain lengths |
+
+### Testing Data & Metrics
+
+#### Testing Data
+
+The model was evaluated on a test set derived from our original development and training data, comprising approximately 1,558 examples (5% of the total dataset) with balanced label distribution.
+
+#### Metrics
+
+Evaluation metrics included:
+- Accuracy
+- Precision
+- Recall
+- F1 Score
+- Reasoning quality (measured by token length vs. accuracy analysis)
+- Token Length Analysis (performance analysis across different reasoning chain lengths)
+
+### Results
+
+<div align="center">
+  <img src="metrics/model_performance.png" alt="Model Performance Comparison" width="800"/>
+  <p><em>Figure: Performance comparison showing how models fine-tuned on this dataset dramatically outperform baseline models, especially in recall and F1 score metrics.</em></p>
+</div>
+
+The table below shows the performance of our best model configurations on the test set:
 
 ## Considerations for Using the Data
 
@@ -226,7 +253,7 @@ Future NLI datasets might benefit from:
 A particularly important bias we observed relates to reasoning length and prediction tendencies:
 
 <div align="center">
-  <img src="../metrics/prediction_distribution.png" alt="Prediction Distribution by Token Length" width="700"/>
+  <img src="metrics/prediction_distribution.png" alt="Prediction Distribution by Token Length" width="700"/>
   <p><em>Figure 7: Distribution of predictions across different token length ranges, showing longer reasoning chains tend toward no-entailment predictions.</em></p>
 </div>
 
