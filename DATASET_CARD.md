@@ -7,7 +7,7 @@ license: apache-2.0
 # Mistral-7B NLI Chain-of-Thought Dataset
 
 <div align="center">
-  <img src="metrics/dataset_banner.png" alt="NLI Dataset Banner" width="600"/>
+  <img src="../metrics/dataset_banner.png" alt="NLI Dataset Banner" width="600"/>
 </div>
 
 ## Dataset Description
@@ -32,7 +32,7 @@ The dataset was created from a collection of premise-hypothesis pairs with binar
 ### Data Collection and Augmentation Pipeline
 
 <div align="center">
-  <img src="metrics/data_pipeline.png" alt="Data Pipeline" width="800"/>
+  <img src="../metrics/data_pipeline.png" alt="Data Pipeline" width="800"/>
   <p><em>Figure 1: The Reflection-CoT data generation pipeline, showing the process of creating augmented training data through multiple stages.</em></p>
 </div>
 
@@ -67,7 +67,7 @@ This step resulted in detailed reasoning chains that break down the inference pr
 #### 3. Reflection-CoT Generation
 
 <div align="center">
-  <img src="metrics/reflection_process.png" alt="Reflection Process" width="700"/>
+  <img src="../metrics/reflection_process.png" alt="Reflection Process" width="700"/>
   <p><em>Figure 2: The Reflection-CoT process showing how incorrect initial reasoning is analyzed and corrected by a stronger model.</em></p>
 </div>
 
@@ -123,7 +123,7 @@ The final dataset underwent several processing steps:
 ### Dataset Statistics
 
 <div align="center">
-  <img src="metrics/dataset_statistics.png" alt="Dataset Statistics" width="600"/>
+  <img src="../metrics/dataset_statistics.png" alt="Dataset Statistics" width="600"/>
   <p><em>Figure 3: Composition of the dataset showing distribution by data source (original vs. reflection-corrected) and label balance.</em></p>
 </div>
 
@@ -140,12 +140,12 @@ The final dataset underwent several processing steps:
 ### Token Length Analysis
 
 <div align="center">
-  <img src="metrics/token_count_distribution.png" alt="Token Count Distribution" width="700"/>
+  <img src="../metrics/token_count_distribution.png" alt="Token Count Distribution" width="700"/>
   <p><em>Figure 4: Distribution of token counts across premises, hypotheses, and reasoning chains in the dataset.</em></p>
 </div>
 
 <div align="center">
-  <img src="metrics/token_lengths.png" alt="Token Lengths" width="700"/>
+  <img src="../metrics/token_lengths.png" alt="Token Lengths" width="700"/>
   <p><em>Figure 5: Box plot showing the distribution of token lengths for different components of the dataset.</em></p>
 </div>
 
@@ -162,7 +162,7 @@ This analysis shows that reasoning chains are significantly longer than premises
 One of the most important findings in our dataset analysis was the relationship between reasoning chain length and accuracy:
 
 <div align="center">
-  <img src="metrics/original_token_vs_accuracy.png" alt="Original Thoughts Token Length vs Accuracy" width="700"/>
+  <img src="../metrics/original_token_vs_accuracy.png" alt="Original Thoughts Token Length vs Accuracy" width="700"/>
   <p><em>Figure 6: Relationship between reasoning chain length and accuracy in the initial generated thoughts, showing declining performance with longer chains.</em></p>
 </div>
 
@@ -226,7 +226,7 @@ Future NLI datasets might benefit from:
 A particularly important bias we observed relates to reasoning length and prediction tendencies:
 
 <div align="center">
-  <img src="metrics/prediction_distribution.png" alt="Prediction Distribution by Token Length" width="700"/>
+  <img src="../metrics/prediction_distribution.png" alt="Prediction Distribution by Token Length" width="700"/>
   <p><em>Figure 7: Distribution of predictions across different token length ranges, showing longer reasoning chains tend toward no-entailment predictions.</em></p>
 </div>
 

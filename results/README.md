@@ -44,6 +44,6 @@ This will download the entire dataset content into the local `results/` director
 Inference runs typically produce:
 
 *   **`.json` file**: Contains detailed output for each sample, including premise, hypothesis, predicted label, and the model's generated text (which includes the chain-of-thought reasoning).
-*   **`.csv` file**: A simple CSV containing just the `predicted_label` for each sample, useful for quick analysis or scoring.
+*   **`.csv` file**: A simple CSV containing just the `prediction` column with 0/1 values, useful for quick analysis or scoring.
 
-Files are named using the pattern: `[MODEL_NAME]-[DATA_NAME]-[TIMESTAMP].[extension]` 
+Files are named using the pattern: `[model_name]-[dataset_name]-[labelled|unlabelled].[extension]` 
