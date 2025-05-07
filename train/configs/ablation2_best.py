@@ -26,7 +26,7 @@ num_epochs = 5  # Extended training duration
 warmup_ratio = 0.05  # More moderate warmup ratio
 
 # Output directory
-output_dir = "models/mistral-thinking-ablation2-best"
+output_dir = "models/nlistral-ablation2-best"
 
 # Specify final dataset version (if applicable)
 # If path to final dataset is different, uncomment and modify these:

@@ -24,12 +24,12 @@ sample_data = False  # Toggle this to True to use sample data instead of minimal
 if sample_data:
     train_data = "data/finetune/sample_ft.jsonl"
     eval_data = "data/finetune/sample_ft.jsonl"
-    output_dir = "models/mistral-thinking-sample-test"
+    output_dir = "models/nlistral-sample-test"
 else:
     # Ultra-minimal data - just use the first 10 examples
     train_data = "data/finetune/train_ft.jsonl"
     eval_data = "data/finetune/dev_ft.jsonl"
-    output_dir = "models/mistral-thinking-quick-test"
+    output_dir = "models/nlistral-quick-test"
 seed = 42
 
 # LoRA parameters - reduced for speed
@@ -59,7 +59,7 @@ max_train_samples = 10 if not sample_data else 100  # Use 10 examples for minima
 max_eval_samples = 10 if not sample_data else 50    # Use 10 examples for minimal, 50 for sample
 
 # Wandb
-wandb_project = "mistral_thinking_nli"
+wandb_project = "nlistral-quick-test"
 wandb_run_name = "quick_test"
 use_wandb = False  # Disable wandb for quick testing
 

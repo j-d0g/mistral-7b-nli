@@ -10,7 +10,7 @@ To back up or share your results, you can upload the entire `results/` directory
 # Ensure your .env file has your HF_TOKEN
 # Build the Docker image if needed: docker build -t mistral-nli-ft .
 
-# Upload results to the default dataset (jd0g/Mistral-NLI-Results) or your own
+# Upload results to the default dataset (jd0g/nlistral-7b-results) or your own
 docker run --rm \
   -v $(pwd):/app \
   -w /app \
@@ -20,7 +20,7 @@ docker run --rm \
   python3 results/upload_results.py
 ```
 
-If `HF_USERNAME` and `HF_RESULTS_REPO_NAME` are not specified, it defaults to `jd0g/Mistral-NLI-Results`. The script will create the dataset repository if it doesn't exist.
+If `HF_USERNAME` and `HF_RESULTS_REPO_NAME` are not specified, it defaults to `jd0g/nlistral-7b-results`. The script will create the dataset repository if it doesn't exist.
 
 ## Downloading Results from Hugging Face
 

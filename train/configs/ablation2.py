@@ -16,7 +16,7 @@ Key characteristics:
 model_id = "mistralai/Mistral-7B-v0.3"
 train_data = "data/finetune/train_ft.jsonl"
 eval_data = "data/finetune/dev_ft.jsonl"
-output_dir = "models/mistral-thinking-ablation2"
+output_dir = "models/nlistral-ablation2"
 seed = 42
 
 # LoRA parameters - doubled capacity
@@ -42,7 +42,7 @@ save_steps = 250
 save_total_limit = 2
 
 # Wandb
-wandb_project = "mistral_thinking_nli"
+wandb_project = "nlistral-ablation2"
 wandb_run_name = "ablation2"
 wandb_run_id = None
 

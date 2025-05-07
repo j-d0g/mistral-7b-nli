@@ -231,7 +231,7 @@ def load_model(model_variant="Ablation1_Best"):
     )
     
     # Load LoRA adapter
-    repo_id = "jd0g/Mistral-v0.3-Thinking_NLI"
+    repo_id = "jd0g/nlistral-7b-qlora"
     model = PeftModel.from_pretrained(base_model, f"{repo_id}/{model_variant}")
     
     # Load tokenizer

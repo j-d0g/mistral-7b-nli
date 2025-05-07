@@ -31,3 +31,8 @@ docker run --rm -v $(pwd):/app -w /app --env-file .env mistral-nli-ft python3 mo
 For details on how to train your own models or use downloaded models for inference, refer to:
 - [TRAINING.md](../TRAINING.md) - Fine-tuning instructions
 - [EVALUATION.md](../EVALUATION.md) - Evaluation guidelines 
+
+## Notes
+
+- The dataset is stored in the Hugging Face repository: `jd0g/nlistral-7b-qlora`
+- The upload and download scripts require a Hugging Face API token in `.env` file (HF_TOKEN) 

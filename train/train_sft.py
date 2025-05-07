@@ -137,7 +137,7 @@ def load_and_merge_config(args):
                 # Absolute minimal defaults as last resort fallback
                 minimal_defaults = {
                     'model_id': "mistralai/Mistral-7B-v0.3",
-                    'output_dir': "models/mistral-thinking",
+                    'output_dir': "models/nlistral-7b-qlora",
                     'seed': 42,
                     'batch_size': 16,
                     'grad_accumulation_steps': 2

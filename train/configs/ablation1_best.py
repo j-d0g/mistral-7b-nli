@@ -23,7 +23,7 @@ warmup_ratio = 0.03  # Lower, carefully tuned warmup ratio
 gradient_checkpointing = True  # Enable gradient checkpointing for performance
 
 # Output directory
-output_dir = "models/mistral-thinking-ablation1-best"
+output_dir = "models/nlistral-ablation1-best"
 
 # Wandb
 wandb_run_name = "ablation1_best" 

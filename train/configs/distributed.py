@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(current_dir))
 from configs.ablation1_best import *
 
 # Model and data paths
-output_dir = "models/mistral-thinking-distributed"
+output_dir = "models/nlistral-distributed"
 
 # Training parameters - adjusted for multiple GPUs
 batch_size = 8  # Per-GPU batch size
@@ -33,7 +33,7 @@ num_epochs = 3  # Extended slightly for distributed setup
 eval_steps = 250  # Less frequent evaluation with multiple GPUs
 
 # Wandb
-wandb_project = "mistral_thinking_nli"
+wandb_project = "nlistral-distributed"
 wandb_run_name = "distributed"
 
 # Distributed training settings - explicitly enabled
