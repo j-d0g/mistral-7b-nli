@@ -15,11 +15,8 @@ The primary objective is to instruction-tune Mistral-7B using a custom NLI datas
 ├── TRAINING.md                  # Training documentation
 ├── EVALUATION.md                # Evaluation documentation
 ├── BLOG.md                      # Experimental journey narrative
-├── HUB_MODEL.md                 # Model card documentation
-├── HUB_DATASET.md               # Dataset card documentation
 ├── REPORT.md                     # Research findings and methodology
-
-├── run_training.sh              # Training script via Docker 
+├── run_training.sh              # Training script via Docker
 ├── run_inference.sh             # Inference script via Docker
 ├── run_metrics.sh               # Compute Metrics script via Docker
 
@@ -28,7 +25,8 @@ The primary objective is to instruction-tune Mistral-7B using a custom NLI datas
 │   ├── original_thoughts/       # Augmented JSON thought files
 │   ├── reflected_thoughts/      # Reflected JSON thought files
 │   ├── finetune/                # Final JSONL finetuning data
-│   └── download_data.py         # Dataset download from HF
+│   ├── download_data.py         # Dataset download from HF
+│   └── DATASET_CARD.md           # Dataset card documentation
 
 ├── train/                       # Training components
 │   ├── train_sft.py             # Main training implementation
@@ -45,7 +43,8 @@ The primary objective is to instruction-tune Mistral-7B using a custom NLI datas
 │   └── analysis/                # Data analysis & visualization
 
 ├── models/                      # Model storage
-│   └── download_model.py        # Model download from HF
+│   ├── download_model.py        # Model download from HF
+    └── MODEL_CARD.md             # Model card documentation
 
 ├── results/                     # Evaluation results storage
 │   └── download_results.py      # Benchmarks download from HF
@@ -77,8 +76,8 @@ Additional documentation:
 * **[README.md](README.md)** - Project overview and setup instructions.
 * **[REPORT.md](REPORT.md)** - Write-up on methodology and results.
 * **[BLOG.md](BLOG.md)** - Chronological brain-dump style narrative of the experimental journey.
-* **[HUB_DATASET.md](HUB_DATASET.md)** - Dataset card on HuggingFace.
-* **[HUB_MODEL.md](HUB_MODEL.md)** - Model card on HuggingFace.
+* **[DATASET_CARD.md](data/DATASET_CARD.md)** - Dataset card on HuggingFace.
+* **[MODEL_CARD.md](models/MODEL_CARD.md)** - Model card on HuggingFace.
 
 
 ### Key Directories
@@ -141,7 +140,7 @@ python3 scripts/generate_thoughts.py --api mistral --input-csv data/original_dat
 
 # For training and inference (Docker required)
 ./run_training.sh --config train/configs/quick_test.py
-./run_inference.sh --model models/nlistral-ablation0 --data data/original_data/sample.csv
+./run_inference.sh --model models/nlistral-ablation1 --data data/original_data/sample.csv
 ```
 
 ## Project Highlights
