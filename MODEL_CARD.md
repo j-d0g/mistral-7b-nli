@@ -208,90 +208,82 @@ The binary entailment/non-entailment distinction can be highly subjective in bor
 ### Usage Example
 
 ```python
+import os
+import json
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-from peft import PeftModel
-import json
+from peft import PeftModel, PeftConfig 
+from dotenv import load_dotenv
 
-# Load model
-def load_model(model_variant="Ablation1_Best"):
-    # Configure 4-bit quantization
-    quantization_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_compute_dtype=torch.bfloat16,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_use_double_quant=True
-    )
-    
-    # Load base model and adapter
-    base_model = AutoModelForCausalLM.from_pretrained(
-        "mistralai/Mistral-7B-v0.3",
-        quantization_config=quantization_config,
-        device_map="auto"
-    )
-    
-    # Load LoRA adapter
-    repo_id = "jd0g/nlistral-7b-qlora"
-    model = PeftModel.from_pretrained(base_model, f"{repo_id}/{model_variant}")
-    
-    # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained("mistralai/Mistral-7B-v0.3")
-    
-    return model, tokenizer
+# --- Configuration ---
+HUB_REPO_ID = "jd0g/nlistral-7b-qlora"
+ADAPTER_NAME_ON_HUB = "nlistral-7b-qlora-ablation1-best" # This is the subfolder name on the Hub
+GPU_ID = 0
+# ---
 
-# Run inference on a single example
-def predict(model, tokenizer, premise, hypothesis):
-    # Create prompt
-    prompt = f"""Premise: {premise}
-Hypothesis: {hypothesis}
+load_dotenv()
+HF_TOKEN = "YOUR HF TOKEN HERE"
 
-Determine if the hypothesis can be inferred from the premise. Write out your thought process step by step, then provide your final answer (1 for entailment, 0 for no entailment). Respond in JSON format with 'thought_process' and 'predicted_label' keys."""
-    
-    # Generate prediction
-    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-    with torch.no_grad():
-        outputs = model.generate(**inputs, max_new_tokens=512, temperature=0.1)
-    
-    # Extract result
-    result = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    
-    # Parse JSON from result
-    try:
-        # Find JSON object in response
-        start_idx = result.find('{')
-        end_idx = result.rfind('}')
-        if start_idx != -1 and end_idx != -1:
-            json_str = result[start_idx:end_idx+1]
-            data = json.loads(json_str)
-            return {
-                "label": data.get("predicted_label"),
-                "reasoning": data.get("thought_process")
-            }
-    except:
-        pass
-    
-    # Fallback - look for explicit label
-    if "predicted_label: 0" in result.lower():
-        return {"predicted_label": 0, "reasoning": result}
-    elif "predicted_label: 1" in result.lower():
-        return {"label": 1, "reasoning": result}
-    
-    return {"label": None, "reasoning": result}
+# Download adapter_config.json from the subfolder on the Hub
+adapter_config = PeftConfig.from_pretrained(HUB_REPO_ID, subfolder=ADAPTER_NAME_ON_HUB, token=HF_TOKEN)
+BASE_MODEL_ID = adapter_config.base_model_name_or_path
 
-# Example usage
-if __name__ == "__main__":
-    # Load model
-    model, tokenizer = load_model()
-    
-    # Run prediction
-    premise = "All birds can fly."
-    hypothesis = "Penguins can fly."
-    
-    result = predict(model, tokenizer, premise, hypothesis)
-    
-    # Print results
-    print(f"Prediction: {result['label']}")
-    print(f"Reasoning (excerpt): {result['reasoning'][:150]}...")
+
+#  Configure 4-bit quantization
+quantization_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_compute_dtype=torch.bfloat16,
+    bnb_4bit_use_double_quant=True,
+    bnb_4bit_quant_type="nf4"
+)
+
+# Load the base model with quantization
+print(f"Loading base model '{BASE_MODEL_ID}' with 4-bit quantization on GPU {GPU_ID}...")
+base_model = AutoModelForCausalLM.from_pretrained(
+    BASE_MODEL_ID,
+    quantization_config=quantization_config,
+    device_map={"": GPU_ID},
+    trust_remote_code=True,
+    token=HF_TOKEN
+)
+print("Base model loaded.")
+
+# Load the tokenizer directly from the adapter's location on the Hub
+print(f"Loading tokenizer from Hub: '{HUB_REPO_ID}' (subfolder: '{ADAPTER_NAME_ON_HUB}')...")
+tokenizer = AutoTokenizer.from_pretrained(
+    HUB_REPO_ID,
+    subfolder=ADAPTER_NAME_ON_HUB, # Specify the subfolder
+    use_fast=True,
+    padding_side="left",
+    token=HF_TOKEN
+)
+print("Tokenizer loaded.")
+
+# Resize token embeddings if necessary
+if len(tokenizer) != base_model.config.vocab_size:
+    print(f"Resizing token embeddings of base model from {base_model.config.vocab_size} to {len(tokenizer)}.")
+    base_model.resize_token_embeddings(len(tokenizer))
+
+# Apply the PEFT adapter to the base model, loading adapter weights from the Hub
+print(f"Applying PEFT adapter '{ADAPTER_NAME_ON_HUB}' from Hub to the base model...")
+model = PeftModel.from_pretrained(
+    base_model,
+    HUB_REPO_ID,
+    subfolder=ADAPTER_NAME_ON_HUB,
+    token=HF_TOKEN
+)
+model.eval() # Set the model to evaluation mode
+print("PEFT adapter applied. Model is ready.")
+
+# Set pad_token if not already set
+if tokenizer.pad_token is None:
+    print("Tokenizer pad_token is None. Setting it to eos_token.")
+    tokenizer.pad_token = tokenizer.eos_token
+
+# 'model' and 'tokenizer' are now ready for use.
+ADAPTER_PATH = f"{HUB_REPO_ID}/{ADAPTER_NAME_ON_HUB}"
+
+print(f"\nModel and tokenizer for '{ADAPTER_PATH}' loaded successfully from Hugging Face Hub.")
 ```
 
 This example demonstrates the essential steps:
@@ -302,6 +294,58 @@ This example demonstrates the essential steps:
 4. Extracting the label and reasoning from the model's output
 
 For batch processing and more advanced features, please refer to the full evaluation script in the repository.
+
+### Interactive Demo
+
+We provide an interactive Jupyter notebook demo that allows exploring the model in a more user-friendly way. The notebook features:
+
+1. Load and explore sample data
+2. Run inference on examples with clear visualization
+3. Analyze Chain-of-Thought reasoning step-by-step
+4. Process multiple examples in batches
+
+Here's a streamlined version of the code that you can use to quickly test the model:
+
+```python
+import os
+import json
+import torch
+import pandas as pd
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+# 1. Define the prompt template
+FINETUNE_PROMPT = """Premise: {premise}
+Hypothesis: {hypothesis}
+
+Use chain of thought reasoning to determine if the hypothesis is entailed by the premise. Provide your reasoning and the final label (0 or 1) in JSON format: {{"thought_process": "...", "predicted_label": ...}}"""
+
+premise = "The cat is on the rug."
+hypothesis = "A feline is on the mat."
+
+formatted_prompt = FINETUNE_PROMPT.format(
+    premise=premise,
+    hypothesis=hypothesis
+)
+
+input_text = f"[INST] {formatted_prompt} [/INST]"
+
+
+inputs = tokenizer(input_text, return_tensors="pt").to(next(model.parameters()).device)
+
+# Generate
+with torch.no_grad():
+    output_sequences = model.generate(**inputs, max_new_tokens=256, pad_token_id=tokenizer.eos_token_id)
+
+# Decode and print only the generated part
+generated_text = tokenizer.decode(output_sequences[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+generated_text
+```
+
+**Example Output:**
+```JSON
+{"thought_process": "step 1: the premise states that the cat is on the rug. a rug is a type of mat, often used for floor coverings. step 2: the hypothesis suggests that a feline is on the mat. since a mat can refer to a rug, and the cat is on the rug, it can be inferred that a feline is on the mat. step 3: based on the logical reasoning and lack of contradictory facts, the hypothesis can be inferred from the premise.", "predicted_label": 1}
+```
+
 
 ### Project Context
 

@@ -7,6 +7,7 @@ This document provides instructions for evaluating NLI models on test datasets, 
 - [Quick Start](#quick-start)
   - [Prerequisites](#prerequisites)
   - [Evaluating a Model](#evaluating-a-model)
+  - [Interactive Demo Notebook](#interactive-demo-notebook)
   - [Understanding Results](#understanding-results)
   - [Common Issues](#common-issues)
 - [Deep Dive: Evaluation Details](#deep-dive-evaluation-details)
@@ -67,6 +68,31 @@ docker run --rm -v $(pwd):/app -w /app --env-file .env mistral-nli-ft python3 mo
 # Then evaluate it
 ./run_inference.sh --model models/nlistral-ablation0 --data data/original_data/test.csv
 ```
+
+### Option 3: Interactive Demo Notebook
+
+For a more user-friendly evaluation experience, especially when testing with custom examples, you can use our interactive Jupyter notebook:
+
+1. **Start the Jupyter server in Docker**:
+   ```bash
+   ./run_notebook.sh
+   ```
+
+2. **Open the provided URL** in your browser and navigate to `demo.ipynb`
+
+The demo notebook provides a streamlined interface for:
+- Loading models directly from HuggingFace
+- Processing individual premise-hypothesis pairs interactively
+- Batch processing from CSV files
+- Extracting predictions in the required format
+
+This approach is particularly useful for:
+- Quick experimentation with custom examples
+- Testing models without running command-line scripts
+- Visualizing outputs and understanding model behavior
+- Preparing submission files from test datasets
+
+If you prefer to work in your IDE, you can also connect VS Code or other IDEs to the Jupyter server running in Docker.
 
 ## Understanding Results
 
@@ -139,6 +165,10 @@ The evaluation process consists of these key components:
    - `prompts.py`: Contains the inference prompt template
    - Parsing logic within `sample_model.py` to extract JSON from model outputs
 
+4. **Interactive Demo**:
+   - `demo.ipynb`: Jupyter notebook with streamlined code for model loading and inference
+   - `run_notebook.sh`: Script to launch the Jupyter environment in Docker
+
 ## Command Examples
 
 Here are more detailed examples of running inference:
@@ -155,6 +185,9 @@ Here are more detailed examples of running inference:
 
 # Running on unlabeled data (will not report accuracy)
 ./run_inference.sh --model models/nlistral-ablation1 --data data/sample/unlabeled_examples.csv
+
+# Running the interactive notebook (alternative to command-line)
+./run_notebook.sh
 ```
 
 ## Output File Structure

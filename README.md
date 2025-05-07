@@ -24,8 +24,8 @@ The primary objective is to instruction-tune Mistral-7B using a custom NLI datas
 ├── run_training.sh              # Training script via Docker
 ├── run_inference.sh             # Inference script via Docker
 ├── run_metrics.sh               # Compute Metrics script via Docker
-├── run_notebook                 #              
-├── demo.ipynb                   # Demo code             
+├── run_notebook.sh              # Launch Jupyter notebook in Docker             
+├── demo.ipynb                   # Interactive demo notebook             
 
 
 ├── data/                        # Augmented Data Directory
@@ -133,6 +133,29 @@ To get started with the project:
    ```bash
    ./run_inference.sh --model models/nlistral-ablation1 --data data/original_data/test.csv
    ```
+
+## Interactive Demo Notebook
+
+For a more interactive experience, you can use the included Jupyter notebook:
+
+1. **Start the notebook server in Docker**:
+   ```bash
+   ./run_notebook.sh
+   ```
+
+2. **Open the demo notebook**:
+   - Copy the URL with token from the terminal
+   - Open in your browser
+   - Navigate to `demo.ipynb`
+
+The notebook provides a convenient interface for:
+- Downloading models from HuggingFace
+- Loading models with proper 4-bit quantization
+- Processing individual premise-hypothesis pairs
+- Batch processing from CSV files
+- Extracting and visualizing predictions
+
+This is the quickest way to test our fine-tuned models with your own examples and data.
 
 ## Docker Usage & Environment Setup
 
