@@ -162,4 +162,3 @@ python3 scripts/generate_thoughts.py --api mistral --input-csv data/original_dat
 
 - The Mistral AI team for releasing the Mistral-7B model
 - Hugging Face for their transformers, PEFT, and TRL libraries
-- The Chain-of-Thought paper authors
