@@ -163,6 +163,3 @@ python3 scripts/generate_thoughts.py --api mistral --input-csv data/original_dat
 - The Mistral AI team for releasing the Mistral-7B model
 - Hugging Face for their transformers, PEFT, and TRL libraries
 - The Chain-of-Thought paper authors
-
-
-***Generative AI Disclaimer**: AI Tool(s) were used to aid in iterative development of this solution, as well as mass code refactoring, modularisation, visualizations and development & maintenance of documentation. Without the use of Generative AI as a tool, I would not have been able to have iterated through all the cycles of my solution in time given the constraints. Generative AI was not used to dictate or steer my solution, but rather steered with intent from my own ideas and research interests.*
