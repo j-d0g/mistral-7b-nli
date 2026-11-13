@@ -9,20 +9,20 @@ from service.scoring_service import generate_score, validate_response
 
 
 @pytest.mark.parametrize("api_response,expected_valid", [
-    ('{"score": 4, "label": 1, "improved_thoughts": "Better analysis"}', True),
-    ('{"score": 4, "label": "1", "improved_thoughts": "Analysis"}', False),  # String label
-    ('{"score": "4", "label": 1, "improved_thoughts": "Analysis"}', False),  # String score
-    ('{"label": 1, "improved_thoughts": "Analysis"}', False),  # Missing score
-    ('{"score": 4, "label": 1}', False),  # Missing improved_thoughts
-    ('{"score": 6, "label": 1, "improved_thoughts": "Analysis"}', False),  # Invalid score value
+    ('{"score": 4, "predicted_label": 1, "improved_thought_process": "Better analysis"}', True),
+    ('{"score": 4, "predicted_label": "1", "improved_thought_process": "Analysis"}', False),  # String label
+    ('{"score": "4", "predicted_label": 1, "improved_thought_process": "Analysis"}', False),  # String score
+    ('{"predicted_label": 1, "improved_thought_process": "Analysis"}', False),  # Missing score
+    ('{"score": 4, "predicted_label": 1}', False),  # Missing improved_thought_process
+    ('{"score": 6, "predicted_label": 1, "improved_thought_process": "Analysis"}', False),  # Invalid score value
     ('{invalid json}', False),  # Invalid JSON
 ])
 def test_validate_response(api_response, expected_valid):
     """Test validation of scoring API responses"""
     json_format = {
         "score": "0-5 rating",
-        "label": "0 or 1",
-        "improved_thoughts": "Improved reasoning"
+        "predicted_label": "0 or 1",
+        "improved_thought_process": "Improved reasoning"
     }
     
     result, error = validate_response(api_response, json_format)
@@ -31,8 +31,8 @@ def test_validate_response(api_response, expected_valid):
         assert result is not None
         assert error is None
         assert "score" in result
-        assert "label" in result
-        assert "improved_thoughts" in result
+        assert "predicted_label" in result
+        assert "improved_thought_process" in result
     else:
         assert result is None
         assert error is not None
@@ -45,7 +45,7 @@ def test_generate_score_with_mock_llm(sample_premise, sample_hypothesis, sample_
     mock_llm = MagicMock()
     mock_llm.get_messages.return_value = []
     mock_llm.prompt_template.return_value = {"role": "system", "content": "test"}
-    mock_llm.generate_text.return_value = '{"score": 4, "label": 1, "improved_thoughts": "Better analysis"}'
+    mock_llm.generate_text.return_value = '{"score": 4, "predicted_label": 1, "improved_thought_process": "Better analysis"}'
     
     # Create a temporary directory path
     import tempfile
@@ -64,7 +64,7 @@ def test_generate_score_with_mock_llm(sample_premise, sample_hypothesis, sample_
         true_label=1,
         llm=mock_llm,
         model_name="mock-model",
-        json_format={"score": "0-5", "label": "0 or 1", "improved_thoughts": "analysis"},
+        json_format={"score": "0-5", "predicted_label": "0 or 1", "improved_thought_process": "analysis"},
         json_filepath=temp_dir,
         max_retries=1,
         depth=0
@@ -73,8 +73,8 @@ def test_generate_score_with_mock_llm(sample_premise, sample_hypothesis, sample_
     # Verify result
     assert result is not None
     assert result["score"] == 4
-    assert result["label"] == 1
-    assert result["improved_thoughts"] == "better analysis"
+    assert result["predicted_label"] == 1
+    assert result["improved_thought_process"] == "better analysis"
     
     # Verify LLM was called correctly
     mock_llm.generate_text.assert_called_once()
@@ -90,14 +90,14 @@ def test_integration_generate_score(mistral_client, sample_premise, sample_hypot
     
     json_format = {
         "score": "0-5 rating",
-        "label": "0 or 1",
-        "improved_thoughts": "Improved reasoning"
+        "predicted_label": "0 or 1",
+        "improved_thought_process": "Improved reasoning"
     }
     
     # Define system prompt for scoring
     system_prompt = """You are a world-class expert in natural language inference and logical reasoning. 
     Rate the quality of the thought process on a scale of 0-5, where 5 is excellent.
-    Provide your response in JSON format with score, label, and improved_thoughts fields."""
+    Provide your response in JSON format with score, label, and improved_thought_process fields."""
     
     result = generate_score(
         id="test-integration",
@@ -118,9 +118,9 @@ def test_integration_generate_score(mistral_client, sample_premise, sample_hypot
     # Check result structure (if we get a valid response)
     if result and isinstance(result, dict):
         assert "score" in result
-        assert "label" in result
-        assert "improved_thoughts" in result
+        assert "predicted_label" in result
+        assert "improved_thought_process" in result
         assert isinstance(result["score"], int)
         assert 0 <= result["score"] <= 5
-        assert isinstance(result["label"], int)
-        assert result["label"] in [0, 1] 
+        assert isinstance(result["predicted_label"], int)
+        assert result["predicted_label"] in [0, 1] 

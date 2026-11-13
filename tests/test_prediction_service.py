@@ -6,22 +6,23 @@ import os
 import json
 from unittest.mock import MagicMock, patch
 
-from service.prediction_service import predict_label, validate_response, system_prompt
+from service.prediction_service import predict_label, validate_response
+from utils.prompts import get_prompt
 from llm.mistral import Mistral
 
 
 @pytest.mark.parametrize("api_response,expected_valid", [
-    ('{"thought_process": "Valid analysis", "label": 1}', True),
-    ('{"thought_process": "Valid analysis", "label": "1"}', False),  # String label
-    ('{"label": 1}', False),  # Missing thought_process
-    ('{"thought_process": "Valid analysis", "label": 3}', False),  # Invalid label value
+    ('{"thought_process": "Valid analysis", "predicted_label": 1}', True),
+    ('{"thought_process": "Valid analysis", "predicted_label": "1"}', False),  # String label
+    ('{"predicted_label": 1}', False),  # Missing thought_process
+    ('{"thought_process": "Valid analysis", "predicted_label": 3}', False),  # Invalid label value
     ('{invalid json}', False),  # Invalid JSON
 ])
 def test_validate_response(api_response, expected_valid):
     """Test validation of API responses"""
     json_format = {
         "thought_process": "...",
-        "label": "0 or 1"
+        "predicted_label": "0 or 1"
     }
     
     result, error = validate_response(api_response, json_format)
@@ -30,7 +31,7 @@ def test_validate_response(api_response, expected_valid):
         assert result is not None
         assert error is None
         assert "thought_process" in result
-        assert "label" in result
+        assert "predicted_label" in result
     else:
         assert result is None
         assert error is not None
@@ -38,7 +39,7 @@ def test_validate_response(api_response, expected_valid):
 
 def test_system_prompt():
     """Test that system prompt is properly formatted"""
-    prompt = system_prompt()
+    prompt, _ = get_prompt("initial_generation")
     
     # Should be a string
     assert isinstance(prompt, str)
