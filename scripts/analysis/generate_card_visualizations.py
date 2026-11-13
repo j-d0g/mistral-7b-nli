@@ -419,8 +419,8 @@ def create_model_performance_visualization(metrics):
     
     models = metrics.get("models", {})
     
-    # Extract data
-    model_names = list(models.keys())
+    # Extract data (skip "_comment" style keys)
+    model_names = [name for name in models.keys() if not name.startswith("_")]
     if not model_names:
         # If no models found, create placeholder
         return create_model_performance_visualization(None)
@@ -713,73 +713,6 @@ def create_model_architecture_visualization():
     
     return output_path
 
-def create_training_dynamics_visualization():
-    """Create visualization of training dynamics across ablations."""
-    # Create figure
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), dpi=200)
-    fig.patch.set_facecolor(BACKGROUND_COLOR)
-    
-    # Sample data for illustration (replace with actual data)
-    steps = np.arange(0, 2000, 100)
-    
-    # Loss curves
-    loss_abl0 = 2.5 * np.exp(-steps/1000) + 0.8 + 0.1 * np.random.randn(len(steps))
-    loss_abl1 = 2.3 * np.exp(-steps/1200) + 0.7 + 0.1 * np.random.randn(len(steps))
-    loss_abl2 = 2.2 * np.exp(-steps/800) + 0.6 + 0.08 * np.random.randn(len(steps))
-    
-    # Accuracy curves
-    acc_abl0 = 70 + 25 * (1 - np.exp(-steps/800)) + 2 * np.random.randn(len(steps))
-    acc_abl1 = 72 + 24 * (1 - np.exp(-steps/1000)) + 2 * np.random.randn(len(steps))
-    acc_abl2 = 75 + 23 * (1 - np.exp(-steps/600)) + 1.5 * np.random.randn(len(steps))
-    
-    # Plot loss curves - using more distinct colors
-    ax1.plot(steps, loss_abl0, color=MISTRAL_COLORS[0], label='Ablation0', linewidth=2)
-    ax1.plot(steps, loss_abl1, color=MISTRAL_COLORS[1], label='Ablation1', linewidth=2)
-    ax1.plot(steps, loss_abl2, color=MISTRAL_COLORS[2], label='Ablation2', linewidth=2)
-    
-    # Add early stopping points
-    ax1.scatter([1400, 1600, 1800], [loss_abl0[14], loss_abl1[16], loss_abl2[18]], 
-                color=HIGHLIGHT_COLOR, s=80, zorder=10, edgecolor='white')
-    
-    # Customize loss plot
-    ax1.set_title('Training Loss', fontsize=14)
-    ax1.set_xlabel('Training Steps', fontsize=12)
-    ax1.set_ylabel('Loss', fontsize=12)
-    ax1.grid(alpha=0.3)
-    ax1.legend()
-    
-    # Plot accuracy curves
-    ax2.plot(steps, acc_abl0, color=MISTRAL_COLORS[0], label='Ablation0', linewidth=2)
-    ax2.plot(steps, acc_abl1, color=MISTRAL_COLORS[1], label='Ablation1', linewidth=2)
-    ax2.plot(steps, acc_abl2, color=MISTRAL_COLORS[2], label='Ablation2', linewidth=2)
-    
-    # Add early stopping points
-    ax2.scatter([1400, 1600, 1800], [acc_abl0[14], acc_abl1[16], acc_abl2[18]], 
-                color=HIGHLIGHT_COLOR, s=80, zorder=10, edgecolor='white')
-    
-    # Customize accuracy plot
-    ax2.set_title('Validation Accuracy', fontsize=14)
-    ax2.set_xlabel('Training Steps', fontsize=12)
-    ax2.set_ylabel('Accuracy (%)', fontsize=12)
-    ax2.grid(alpha=0.3)
-    ax2.set_ylim(65, 100)
-    ax2.legend()
-    
-    # Add note that this is placeholder data
-    fig.text(0.5, 0.01, "Placeholder visualization - Replace with actual training dynamics data",
-            ha='center', va='bottom', fontsize=10, style='italic')
-    
-    # Title for the whole figure
-    fig.suptitle('Training Dynamics Comparison', fontsize=16, y=0.98)
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    
-    # Save figure
-    output_path = os.path.join(OUTPUT_DIR, "training_dynamics.png")
-    plt.savefig(output_path, dpi=200, bbox_inches='tight', facecolor=BACKGROUND_COLOR)
-    plt.close()
-    
-    return output_path
-
 def main():
     """Main function to generate all visualizations."""
     print("Generating visualizations for Hugging Face cards...")
@@ -818,9 +751,6 @@ def main():
     
     print("Creating model architecture visualization...")
     visualizations["model_architecture"] = create_model_architecture_visualization()
-    
-    print("Creating training dynamics visualization...")
-    visualizations["training_dynamics"] = create_training_dynamics_visualization()
     
     print("All visualizations generated and saved to the metrics directory.")
     print("Done!")

@@ -1,22 +1,23 @@
 {
+  "_comment": "All values reproduce from the public files listed in README.md ('Data and splits', 'Results'). Dataset counts: train.csv / dev.csv / test.csv in jd0g/Mistral-NLI-Thoughts (data/original_data). Token statistics: scripts/analysis/analyze_token_lengths.py --train-file data/finetune/train_ft.jsonl --dev-file data/finetune/dev_ft.jsonl --test-file data/original_data/test.csv (token counts are estimated as characters/4, not a tokenizer count). Model metrics: scripts/analysis/compute_test_metrics.py over jd0g/nlistral-7b-results (1,977-row test set, precision/recall/F1 macro-averaged). Token-vs-accuracy: scripts/analysis/analyze_finetuned_results.py on results/nlistral-ablation1-test-labelled.json.",
   "dataset": {
-    "train_examples": 28051,
-    "dev_examples": 1558,
-    "test_examples": 1558,
-    "total_examples": 31167,
+    "train_examples": 35593,
+    "dev_examples": 1977,
+    "test_examples": 1977,
+    "total_examples": 39547,
     "train_percentage": 90.0,
     "dev_percentage": 5.0,
     "test_percentage": 5.0,
     "label_distribution": {
-      "entailment": 16125,
-      "no_entailment": 15042,
-      "entailment_percentage": 51.74,
-      "no_entailment_percentage": 48.26
+      "entailment": 20407,
+      "no_entailment": 19140,
+      "entailment_percentage": 51.6,
+      "no_entailment_percentage": 48.4
     }
   },
   "tokens": {
     "premise": {
-      "avg": 26.87,
+      "avg": 26.88,
       "min": 0,
       "max": 340,
       "quartiles": [
@@ -36,43 +37,37 @@
       ]
     },
     "thought_process": {
-      "avg": 164.54,
+      "avg": 168.39,
       "min": 4,
       "max": 921,
       "quartiles": [
-        125.0,
-        153.0,
-        191.0
+        128.0,
+        158.0,
+        196.0
       ]
     }
   },
   "models": {
-    "_comment": "Model performance metrics based on the first 1558 examples in the test set",
+    "_comment": "Test set = data/original_data/test.csv, 1,977 rows. Precision, recall and F1 are macro-averaged over the two classes.",
     "Base_Mistral-7B": {
       "accuracy": 53.77,
       "precision": 60.49,
       "recall": 52.32,
       "f1_score": 41.51
     },
-    "Mistral-7B-Instruct": {
-      "accuracy": 76.0,
-      "precision": 89.7,
-      "recall": 57.2,
-      "f1_score": 69.8
-    },
-    "Ablation0_Best": {
+    "Ablation0": {
       "accuracy": 89.23,
       "precision": 89.21,
       "recall": 89.25,
       "f1_score": 89.22
     },
-    "Ablation1_Best": {
+    "Ablation1": {
       "accuracy": 89.58,
       "precision": 89.57,
       "recall": 89.58,
       "f1_score": 89.57
     },
-    "Ablation2_Best": {
+    "Ablation2": {
       "accuracy": 89.33,
       "precision": 89.38,
       "recall": 89.27,
@@ -80,7 +75,7 @@
     }
   },
   "token_vs_accuracy": {
-    "_comment": "Token length vs accuracy statistics from the filtered test set results",
+    "_comment": "Ablation 1 on the 1,977-row test set; reasoning length estimated as characters/4.",
     "ranges": [
       "0-100",
       "101-200",
@@ -94,10 +89,10 @@
       60.87
     ],
     "counts": [
-      122,
-      1220,
-      197,
-      19
+      155,
+      1549,
+      250,
+      23
     ]
   }
 }
