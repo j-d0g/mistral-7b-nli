@@ -7,22 +7,23 @@ from huggingface_hub import hf_hub_download, HfApi, list_repo_files
 # Load environment variables from .env file
 load_dotenv()
 
-# Get HF token from environment variables
-HF_TOKEN = os.getenv("HF_TOKEN")
-if not HF_TOKEN:
-    print("Error: HF_TOKEN not found in .env file")
-    sys.exit(1)
+# HF token is optional: the dataset is public. It is read from .env if present.
+HF_TOKEN = os.getenv("HF_TOKEN") or None
 
 # User info
 USERNAME = "jd0g"
-REPO_NAME = "nlistral-7b-dataset"
+REPO_NAME = "Mistral-NLI-Thoughts"
 REPO_ID = f"{USERNAME}/{REPO_NAME}"
-LOCAL_DATA_DIR = Path("data")
+# The complete copy of the data lives under the "data/" prefix in the repository,
+# mirroring this project's layout, so files are downloaded into the project root.
+REMOTE_PREFIX = "data/"
+LOCAL_DATA_DIR = Path(".")
 
 # Files to exclude when downloading
 EXCLUDED_FILES = [
     "data/download_dataset.py",
     "data/upload_dataset.py",
+    "data/download_data.py",
     "data/README.md"
 ]
 
@@ -38,8 +39,8 @@ def download_dataset_from_hf():
             token=HF_TOKEN
         )
         
-        # Filter out excluded files
-        files_to_download = [f for f in all_files if f not in EXCLUDED_FILES]
+        # Keep only the "data/"-prefixed copy and drop excluded files
+        files_to_download = [f for f in all_files if f.startswith(REMOTE_PREFIX) and f not in EXCLUDED_FILES]
         
         if not files_to_download:
             print("No files found to download.")

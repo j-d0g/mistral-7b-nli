@@ -9,7 +9,7 @@ MAX_LENGTH=512
 SAVE_EVERY=1
 
 # Default parameters that can be changed
-MODEL_PATH="models/mistral-7b-nli-cot"
+MODEL_PATH="models/nlistral-ablation1"
 TEST_FILE="data/original_data/sample.csv"
 GPU_ID=0
 
@@ -32,8 +32,8 @@ while [[ $# -gt 0 ]]; do
     --help|-h)
       echo "Usage: $0 [options]"
       echo "Options:"
-      echo "  --model, -m PATH           Path to the model (default: models/mistral-7b-nli-cot)"
-      echo "  --data, -d PATH            Path to the test data CSV (default: data/sample/demo.csv)"
+      echo "  --model, -m PATH           Path to the model (default: models/nlistral-ablation1)"
+      echo "  --data, -d PATH            Path to the test data CSV (default: data/original_data/sample.csv)"
       echo "  --gpu, -g ID               GPU ID to use (default: 0)"
       echo "  --help, -h                 Show this help message"
       exit 0

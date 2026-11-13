@@ -26,7 +26,7 @@ if not HF_TOKEN:
 
 # User info
 USERNAME = "jd0g"
-REPO_NAME = "nlistral-7b-dataset"
+REPO_NAME = "Mistral-NLI-Thoughts"
 REPO_ID = f"{USERNAME}/{REPO_NAME}"
 LOCAL_DATA_DIR = Path("data")
 
@@ -72,7 +72,7 @@ def upload_dataset_to_hf():
                 folder_path=dir_path,
                 repo_id=REPO_ID,
                 repo_type="dataset",
-                path_in_repo=data_dir,
+                path_in_repo=f"data/{data_dir}",
                 token=HF_TOKEN
             )
             print(f"Successfully uploaded {data_dir}")
