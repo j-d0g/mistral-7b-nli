@@ -1,5 +1,12 @@
 ---
 license: apache-2.0
+language:
+- en
+base_model: mistralai/Mistral-7B-v0.3
+library_name: peft
+pipeline_tag: text-generation
+datasets:
+- jd0g/Mistral-NLI-Thoughts
 tags:
 - natural-language-inference
 - nli
@@ -9,203 +16,183 @@ tags:
 - fine-tuning
 - peft
 - lora
+- qlora
 ---
 
-# Model Card for Mistral-7B Fine-tuned for NLI with Chain-of-Thought Reasoning
+# Model Card: Mistral-7B-v0.3 QLoRA adapters for NLI with chain-of-thought
 
-<!-- Provide a quick summary of what the model is/does. -->
+LoRA adapters that fine-tune `mistralai/Mistral-7B-v0.3` for binary Natural Language Inference (NLI). Given a
+premise and a hypothesis, the model writes a short chain-of-thought (CoT) rationale and then a label:
+1 for entailment, 0 for no-entailment, as a JSON object.
 
-This model is a fine-tuned version of Mistral-7B-v0.3 for Natural Language Inference (NLI) that generates Chain-of-Thought (CoT) reasoning alongside classification labels (0 for no-entailment, 1 for entailment).
+Code, data pipeline and full write-up: https://github.com/j-d0g/mistral-7b-nli
 
 ## Model Details
 
-### Model Description
-
-<!-- Provide a longer summary of what this model is. -->
-
-This model was developed to improve both classification accuracy and reasoning transparency for Natural Language Inference. It uses Parameter-Efficient Fine-Tuning (PEFT) with QLoRA to enhance Mistral-7B's performance on determining whether a hypothesis can be inferred from a premise. The model produces detailed reasoning chains explaining its decision-making process before providing a final classification.
+- **Developed by:** Jordan Tran, as coursework at The University of Manchester
+- **Model type:** Causal language model with LoRA adapters, trained for NLI with CoT output
+- **Base model:** [`mistralai/Mistral-7B-v0.3`](https://huggingface.co/mistralai/Mistral-7B-v0.3) (Jiang et al., 2023, [arXiv:2310.06825](https://arxiv.org/abs/2310.06825))
+- **Fine-tuning method:** QLoRA (4-bit NF4 quantised base weights with double quantisation; LoRA on `q_proj`, `k_proj`, `v_proj`, `o_proj`)
+- **Language:** English
+- **Licence:** Apache 2.0 (adapters and code); the base model is Apache 2.0
 
 <div align="center">
   <img src="metrics/model_architecture.png" alt="Model Architecture" width="600"/>
-  <p><em>Figure 1: Overall architecture showing QLoRA's approach to parameter-efficient fine-tuning with 4-bit quantized base model weights and trainable low-rank adapters.</em></p>
+  <p><em>Figure 1: QLoRA: 4-bit quantised base model weights with trainable low-rank adapters.</em></p>
 </div>
 
-- **Developed by:** Jordan Tran, The University of Manchester
-- **Language(s):** English
-- **Model type:** Natural Language Inference with Chain-of-Thought
-- **Model architecture:** Mistral-7B with LoRA adapters
-- **Finetuned from model:** mistralai/Mistral-7B-v0.3
+This repository holds three adapters, one per ablation, in subfolders:
 
-### Model Resources
+| Subfolder | Config in the code repository | Effective batch | LoRA rank / alpha | Learning rate | Epochs |
+|-----------|-------------------------------|----------------:|------------------:|--------------:|-------:|
+| `nlistral-7b-qlora-ablation0-best` | `train/configs/ablation0_best.py` | 16 (8 x 2) | 16 / 32 | 2e-4 | 2 |
+| `nlistral-7b-qlora-ablation1-best` | `train/configs/ablation1_best.py` | 32 (16 x 2) | 16 / 32 | 2e-4 | 2 |
+| `nlistral-7b-qlora-ablation2-best` | `train/configs/ablation2_best.py` | 64 (16 x 4) | 32 / 64 | 5e-5 | 5 |
 
-<!-- Provide links where applicable. -->
-
-- **Repository:** https://huggingface.co/mistralai/Mistral-7B-v0.3
-- **Paper or documentation:** https://arxiv.org/abs/2310.06825
+`nlistral-7b-qlora-ablation1-best` is the best adapter on the held-out test set and the one to use by default.
 
 ## Training Details
 
 ### Training Data
 
-<!-- This is a short stub of information on the training data that was used, and documentation related to data pre-processing or additional filtering (if applicable). -->
-
-The model was trained on a custom dataset of over 35,000 NLI examples with premise-hypothesis pairs and generated Chain-of-Thought reasoning. This training data was created through our novel Reflection-CoT pipeline:
+The training data is the `data/` folder of the dataset
+[`jd0g/Mistral-NLI-Thoughts`](https://huggingface.co/datasets/jd0g/Mistral-NLI-Thoughts): 35,593 labelled
+premise-hypothesis pairs (`original_data/train.csv`), each with a CoT rationale, formatted for fine-tuning in
+`finetune/train_ft.jsonl` (35,597 rows; four pairs appear twice). The dev split (`dev.csv`, 1,977 pairs) is
+used for validation loss and early stopping; the test split (`test.csv`, 1,977 pairs) is held out.
 
 <div align="center">
   <img src="metrics/data_pipeline.png" alt="Data Pipeline" width="800"/>
-  <p><em>Figure 2: The Reflection-CoT pipeline for data augmentation, showing the process from initial CoT generation to error identification and reflection-based correction.</em></p>
+  <p><em>Figure 2: The Reflection-CoT pipeline: initial CoT generation, error identification, reflection-based correction.</em></p>
 </div>
 
-The pipeline consisted of three key stages:
-1. **Initial CoT Generation**: All premise-hypothesis pairs processed by Mistral-7B to generate reasoning and labels
-2. **Error Identification**: Examples where the initial prediction mismatched the dataset's ground-truth label were flagged (approximately 24.26%)
-3. **Reflection-CoT Generation**: For flagged examples, a stronger model (Mistral-Nemo-12B) was used to analyze the flawed reasoning and generate corrections
+The rationales were produced in two stages:
 
-This approach ensured comprehensive coverage of challenging cases while preserving the model's natural reasoning patterns for examples it already handled correctly.
+1. **Initial CoT generation:** `open-mistral-7b` (Mistral API) wrote a rationale and label for every pair. On
+   the training split 27,066 of 35,597 (76.03%) agreed with the gold label.
+2. **Reflection-CoT:** for the 8,531 training pairs (23.97%) where the label disagreed, `open-mistral-nemo`
+   (12B) was given the premise, hypothesis, gold label and the flawed rationale, and wrote a corrected
+   rationale that reaches the gold label.
+
+The fine-tuning file combines the correct original rationales with the reflected ones, so every training pair
+is covered. Each row is a Mistral-format `[INST] ... [/INST]` prompt followed by the JSON answer.
 
 ### Training Procedure
 
-<!-- This relates heavily to the Technical Specifications. Content here should link to that section when it is relevant to the training procedure. -->
+Training uses `trl`'s `SFTTrainer` with `paged_adamw_8bit`, bfloat16 compute, a cosine learning-rate
+schedule with warm-up, `max_seq_length=512`, evaluation and checkpointing every 250 steps, early stopping
+with patience 3 on validation loss, and the best checkpoint kept (`train/train_sft.py`).
 
 #### Training Hyperparameters
 
-<!-- This is a summary of the values of hyperparameters used in training the model. -->
+| Parameter | Ablation 0 (`ablation0_best.py`) | Ablation 1 (`ablation1_best.py`) | Ablation 2 (`ablation2_best.py`) |
+|-----------|---------------------------------:|---------------------------------:|---------------------------------:|
+| Per-device batch size | 8 | 16 | 16 |
+| Gradient accumulation | 2 | 2 | 4 |
+| Effective batch size | 16 | 32 | 64 |
+| Learning rate | 2e-4 | 2e-4 | 5e-5 |
+| LoRA rank / alpha / dropout | 16 / 32 / 0.05 | 16 / 32 / 0.05 | 32 / 64 / 0.05 |
+| Epochs | 2 | 2 | 5 |
+| Warm-up ratio | 0.03 | 0.03 | 0.05 |
+| Gradient checkpointing | off | on | on |
+| Gradient clipping | none | none | 1.0 |
+| Weight decay | 0.01 | 0.01 | 0.01 |
+| Max sequence length | 512 | 512 | 512 |
 
-We conducted several ablation studies to identify optimal training parameters. The repository hosts the best checkpoint from each ablation study:
+The `ablation2.py` configuration (learning rate 1e-4, 3 epochs, warm-up ratio 0.10) is the one behind the
+ablation 2 test result below; `ablation2_best.py` was trained on `finetune/train_ft_final.jsonl`, which merges
+the test pairs into training, so it is reported only on the dev split.
 
-| Parameter | Ablation0_Best | Ablation1_Best | Ablation2_Best |
-|-----------|----------------|----------------|----------------|
-| Batch Size | 8 per device | 16 per device | 16 per device |
-| Gradient Accumulation | 2 steps | 2 steps | 4 steps |
-| Effective Batch Size | 16 | 32 | 64 |
-| Learning Rate | 2e-4 | 2e-4 | 5e-5 |
-| LoRA Rank | 16 | 16 | 32 |
-| LoRA Alpha | 32 | 32 | 64 |
-| Training Duration | 2 epochs | 2 epochs | 5 epochs |
-| Gradient Checkpointing | Disabled | Enabled | Enabled |
-| Warmup Ratio | 0.03 | 0.03 | 0.05 |
-| Gradient Clipping | None | None | 1.0 |
-| Primary Focus | Small batch | Medium batch with optimization | Large model with stability |
+#### Training logs and runtime
 
-#### Speeds, Sizes, Times
+Full training runs with checkpoints and `trainer_state.json` logs are in
+[`jd0g/Mistral-7B-NLI-v0.3`](https://huggingface.co/jd0g/Mistral-7B-NLI-v0.3). The runs behind the published
+results and their recorded wall-clock times (`train_results.json`):
 
-<!-- This section provides information about how roughly how long it takes to train the model and the size of the resulting model. -->
+| Result | Run | Steps | Training time |
+|--------|-----|------:|--------------:|
+| Ablation 0 | `mistral-thinking-abl0-ext` | 3,402 | 3.5 h (12,587 s) |
+| Ablation 1 | `mistral-thinking-default-epochs2` | 2,224 | not recorded (the run was resumed; `train_results.json` reflects only the resumption) |
+| Ablation 2 (test) | `mistral-thinking-abl3` | 1,275 | 4.8 h (17,374 s) |
+| Ablation 2 (dev, `ablation2_best.py`) | `mistral-thinking-abl3-final` | 2,935 | 9.3 h (33,647 s) |
 
-- **Training Hardware:** 1~4x NVIDIA RTX 4090 GPUs
-- **Base Model Size:** 7B parameters
-- **LoRA Adapter Size:** 591~646 MB depending on configuration
-- **Training Time:** 5-12 hours depending on configuration
-- **Total Training Time:** 50 hours across 25+ ablation studies
+Adapter file size (`adapter_model.safetensors`): 591 MB for the rank-16 adapters and 646 MB for rank 32; the
+tokenizer files add about 4 MB. Inference with the 4-bit base model fits in 16 GB of GPU memory.
 
 <div align="center">
-  <img src="metrics/training_dynamics.png" alt="Training Dynamics" width="700"/>
-  <p><em>Figure 3: Training dynamics for different model configurations, showing validation loss and accuracy during fine-tuning. Note how Ablation2, with its lower learning rate and larger batch size, demonstrates more stable convergence.</em></p>
+  <img src="metrics/training_dynamics.png" alt="Training Dynamics" width="800"/>
+  <p><em>Figure 3: Validation loss and validation mean token accuracy logged every 250 steps for the three runs behind the test results (from the public `trainer_state.json` files; `scripts/analysis/plot_training_dynamics.py`).</em></p>
 </div>
 
 ## Evaluation
 
-<!-- This section describes the evaluation protocols and provides the results. -->
+### Testing Data
 
-### Testing Data & Metrics
-
-#### Testing Data
-
-<!-- This should describe any evaluation data used (e.g., the development/validation set provided). -->
-
-The model was evaluated on a test set derived from our original development and training data, comprising approximately 1,972 examples (5% of the total dataset) with balanced label distribution.
+The held-out split `original_data/test.csv`: 1,977 pairs (1,021 entailment, 956 no-entailment). No pair in
+it appears in the training or dev files. Per-example predictions for every evaluated run are in the dataset
+[`jd0g/nlistral-7b-results`](https://huggingface.co/datasets/jd0g/nlistral-7b-results), and
+`scripts/analysis/compute_test_metrics.py` in the code repository recomputes the table below from them.
 
 ### Results
 
-The table below shows the performance of our best model configurations on the test set:
+Precision, recall and F1 are macro-averaged over the two classes.
 
-| Model | Accuracy | Precision | Recall | F1 Score |
-|-------|----------|-----------|--------|----------|
-| Ablation0_Best | 89.3% | 89.2% | 89.4% | 89.3% |
-| Ablation1_Best | 89.6% | 89.6% | 89.6% | 89.6% |
-| Ablation2_Best | 89.33% | 89.38% | 89.27% | 89.30% |
+| Model | Accuracy | Precision | Recall | F1 | MCC |
+|-------|---------:|----------:|-------:|---:|----:|
+| Mistral-7B-v0.3, zero-shot, no adapter | 53.77% | 60.49% | 52.32% | 41.51% | 0.099 |
+| Ablation 0 (`mistral-thinking-abl0-ext`) | 89.23% | 89.21% | 89.25% | 89.22% | 0.785 |
+| **Ablation 1 (`mistral-thinking-default-epochs2`)** | **89.58%** | **89.57%** | **89.58%** | **89.57%** | **0.791** |
+| Ablation 2 (`mistral-thinking-abl3`, `ablation2.py`) | 89.33% | 89.38% | 89.27% | 89.30% | 0.786 |
 
-When compared to baseline models:
+Relative to the zero-shot base model, ablation 1 improves accuracy by 35.81 percentage points (66.60%
+relative) and macro-F1 by 48.06 percentage points (115.78% relative). The base model predicted entailment for
+94% of pairs, which is why its F1 and MCC are so low.
 
-| Metric | Base Mistral-7B | Mistral-7B-Instruct* | Fine-tuned Model | Relative Improvement** |
-|--------|----------------|-------------------|------------------|----------------------|
-| Accuracy | 53.77% | 76.0% | 89.58% | +66.60% |
-| Precision | 60.49% | 89.7% | 89.57% | +48.07% |
-| Recall | 52.32% | 57.2% | 89.58% | +71.21% |
-| F1 Score | 41.51% | 69.8% | 89.57% | +115.78% |
+Dev-split accuracy: ablation 0 89.07%, ablation 1 88.77%, `ablation2_best.py` run 88.72%.
 
-*Mistral-7B-Instruct with extensive prompt engineering and single-shot examples vs zero-shot fine-tuned model  
-**Relative improvement calculated against the Base Mistral-7B model
+### Accuracy by length of the generated rationale
 
-One of our most significant findings was the improvement in reasoning quality across different chain lengths:
+Bucketing the ablation 1 test outputs by the estimated length of the rationale (characters / 4;
+`scripts/analysis/analyze_finetuned_results.py`):
 
-<div align="center">
-  <img src="metrics/token_accuracy_comparison_combined.png" alt="Comparison of Token Length vs. Accuracy" width="800"/>
-  <p><em>Figure 4: Side-by-side comparison of original model (left) and fine-tuned model (right) accuracy across token length ranges. The fine-tuned model shows significant improvements in medium-to-long reasoning chains (101-300 tokens), with a dramatic +23.41% improvement in the 201-300 token range where accuracy jumps from 68.99% to 92.40%.</em></p>
-</div>
+| Estimated tokens | Test examples | Accuracy |
+|------------------|--------------:|---------:|
+| 0-100 | 155 | 83.87% |
+| 101-200 | 1,549 | 90.12% |
+| 201-300 | 250 | 92.40% |
+| 301+ | 23 | 60.87% |
 
-Our fine-tuned model showed remarkable improvements in handling medium-to-long reasoning chains (101-300 tokens):
+For comparison, the agreement of the teacher model's (`open-mistral-7b`) rationales with the gold labels on
+the training and dev pairs fell steadily with length (86.44%, 80.14%, 69.50%, 57.16% for the same buckets).
+The two analyses are on different data and different models, so they are not a per-bucket measure of the gain
+from fine-tuning.
 
-| Token Range | Mistral-7B-Instruct Accuracy | Fine-tuned Model Accuracy | Improvement |
-|-------------|-------------------------|---------------------------|-------------|
-| 0-100 | 86.06% | 83.87% | -2.19% |
-| 101-200 | 79.34% | 90.12% | +10.78% |
-| 201-300 | 68.99% | 92.40% | +23.41% |
-| 301+ | 56.79% | 60.87% | +4.08% |
+### Unofficial course hidden-test result
 
-These improvements demonstrate that our fine-tuning process successfully addressed the declining performance in longer reasoning chains that was present in the original model, with the most dramatic improvements in the critical 201-300 token range.
-
-## Technical Specifications
-
-### Hardware
-
-- **Training Hardware:** 1~4x NVIDIA RTX 4090 GPUs
-- **Inference Requirements:** 
-  - Minimum: 16GB VRAM with 4-bit quantization
-  - Recommended: 24GB+ VRAM for optimal performance
-
-### Software
-
-- **Framework:** PyTorch with Transformers library
-- **Quantization:** 4-bit with NF4 type and double quantization
-- **Optimizer:** paged_adamw_8bit with weight decay 0.01
-- **Libraries:** PEFT, bitsandbytes, transformers, accelerate
+The course's hidden test set (3,302 pairs, inputs in `original_data/submission.csv`) was scored by the course
+staff after the deadline, unofficially, because the wrong predictions file had been submitted through the
+official channel: accuracy 0.9667, weighted F1 0.9667, macro F1 0.9666, macro precision 0.9670, macro recall
+0.9664, weighted precision 0.9668, MCC 0.9334. The hidden labels are not public, so this cannot be recomputed.
 
 ## Bias, Risks, and Limitations
 
-<!-- This section is meant to convey both technical and sociotechnical limitations. -->
+1. **Domain:** The model is trained on one binary NLI corpus and may not transfer to other domains or to
+   three-way (entailment / neutral / contradiction) NLI.
+2. **Label subjectivity:** Manual review of pairs where the teacher model disagreed with the gold label found
+   many "no-entailment" labels that a reasonable reader might call entailment. The teacher model's labels had
+   90.71% precision but 59.58% recall for entailment on the training split. The training data deliberately
+   aligns the rationales to the gold labels, so the model reproduces the dataset's labelling conventions,
+   including any inconsistencies.
+3. **Long rationales:** Accuracy is lower for the few test examples where the model writes more than about 300
+   estimated tokens (60.87% on 23 examples).
+4. **Output format:** The model is trained to answer with a JSON object; downstream code should still validate
+   it (see `evaluate/parse_predictions.py`).
 
-### Domain Specificity and Model Limitations
+## How to use
 
-1. **Domain Specificity:** The model is trained on a specific set of NLI examples and may not generalize to all domains or specialized knowledge areas
-2. **Reasoning Patterns:** The model may develop specific reasoning patterns that don't represent the full spectrum of logical analysis
-3. **Chain Length Sensitivity:** Very long reasoning chains (301+ tokens) still show decreased performance compared to medium-length chains
+### Loading an adapter from the Hub
 
-### Reasoning Length and Prediction Bias
-
-An important phenomenon observed during training relates to reasoning length and prediction tendencies:
-
-<div align="center">
-  <img src="metrics/prediction_distribution.png" alt="Prediction Distribution by Token Length" width="700"/>
-  <p><em>Figure 5: Analysis of prediction distribution across token length ranges, demonstrating that longer reasoning chains correlate with higher rates of no-entailment predictions.</em></p>
-</div>
-
-As reasoning chain length increases, models become more likely to predict "no-entailment" and less likely to predict "entailment." This creates a bias pattern where longer reasoning tends to be more critical and hesitant to assert entailment relationships.
-
-This pattern appears to be a fundamental aspect of how language models reason - as they generate more text, they consider more potential contradictions or edge cases, naturally leading to more conservative predictions. Our fine-tuning process specifically addressed this bias, resulting in more balanced predictions across different reasoning lengths.
-
-### Labeller Bias and Dataset Subjectivity
-
-Our analysis revealed a significant finding: there appears to be substantial labeller bias in some portions of the dataset. Manual verification of examples where model predictions disagreed with dataset labels showed that many "no-entailment" examples in the dataset could reasonably be classified as "entailment" based on logical analysis.
-
-This observation is reflected in the stark precision-recall imbalance we observed in our initial experiments (approximately 90% precision but only 50% recall). This suggests that in some cases, the disagreement between model predictions and dataset labels may not be due to model errors, but rather due to subjective judgments or inconsistencies in the original dataset annotation process.
-
-The binary entailment/non-entailment distinction can be highly subjective in borderline cases, and our Reflection-CoT mechanism was specifically designed to handle these challenging examples by providing explicit reasoning paths that align with the dataset's ground truth labels, even in cases where the logical connection might be debatable. This approach acknowledges the presence of labeller bias while providing a structured framework to align model behavior with the expected outputs for the task.
-
-## Additional Information
-
-<!-- Any other information that would be useful for other people to know. -->
-
-### Usage Example
+The adapter repository is gated; request access on its page and pass a token.
 
 ```python
 import os
@@ -286,25 +273,7 @@ ADAPTER_PATH = f"{HUB_REPO_ID}/{ADAPTER_NAME_ON_HUB}"
 print(f"\nModel and tokenizer for '{ADAPTER_PATH}' loaded successfully from Hugging Face Hub.")
 ```
 
-This example demonstrates the essential steps:
-
-1. Loading the model with 4-bit quantization
-2. Creating a prompt in the expected format
-3. Running inference to generate a prediction
-4. Extracting the label and reasoning from the model's output
-
-For batch processing and more advanced features, please refer to the full evaluation script in the repository.
-
-### Interactive Demo
-
-We provide an interactive Jupyter notebook demo that allows exploring the model in a more user-friendly way. The notebook features:
-
-1. Load and explore sample data
-2. Run inference on examples with clear visualization
-3. Analyze Chain-of-Thought reasoning step-by-step
-4. Process multiple examples in batches
-
-Here's a streamlined version of the code that you can use to quickly test the model:
+### Running inference
 
 ```python
 import os
@@ -346,9 +315,19 @@ generated_text
 {"thought_process": "step 1: the premise states that the cat is on the rug. a rug is a type of mat, often used for floor coverings. step 2: the hypothesis suggests that a feline is on the mat. since a mat can refer to a rug, and the cat is on the rug, it can be inferred that a feline is on the mat. step 3: based on the logical reasoning and lack of contradictory facts, the hypothesis can be inferred from the premise.", "predicted_label": 1}
 ```
 
+For batch inference from a CSV file see `evaluate/sample_model.py` and `demo.ipynb` in the code repository.
 
-### Project Context
+## Citation
 
-This work was completed as part of the COMP34812 Natural Language Understanding coursework at The University of Manchester. The model demonstrates how Chain-of-Thought reasoning can be integrated with fine-tuning approaches to improve both performance and explainability in NLI tasks.
+```bibtex
+@misc{tran2025nlistral,
+  author = {Jordan Tran},
+  title = {Mistral-7B-v0.3 QLoRA adapters for NLI with chain-of-thought},
+  year = {2025},
+  publisher = {Hugging Face},
+  howpublished = {\url{https://huggingface.co/jd0g/nlistral-7b-qlora}}
+}
+```
 
-*This model card was created as part of the COMP34812 Natural Language Understanding coursework at The University of Manchester.*
+*This model was developed as part of a Natural Language Understanding coursework at The University of
+Manchester. Generative AI tools were used to help with code refactoring, visualisations and documentation.*

@@ -11,7 +11,7 @@ This document captures the chronological development, key decisions, and rationa
 The core task was binary NLI classification, traditionally approached with encoder-based models like BERT. We chose to use a fine-tuned autoregressive LLM (Mistral-7B) combined with CoT for several reasons:
 
 *   **Interpretability:** CoT provides a window into *how* the model reaches its classification, addressing potential label subjectivity and ambiguity.
-*   **State-of-the-Art Approach:** Using CoT generation with a large autoregressive model represents a more advanced technique compared to standard classification.
+*   **Generative approach:** Using CoT generation with an autoregressive model, rather than a classification head, lets the model explain its label.
 *   **Technical Challenge:** This approach involves generation, structured output parsing, and careful prompt engineering, demonstrating deeper engagement with LLM capabilities.
 *   **Synergy with QLoRA Fine-Tuning:** QLoRA doesn't alter the base weights, so fine-tuning data should complement, not contradict, the base model's reasoning patterns.
 
@@ -32,7 +32,7 @@ We selected `mistralai/Mistral-7B-v0.3` based on several factors:
 Our first approach was naive in several ways:
 
 1. We used a pre-quantized GPTQ version of Mistral-7B with poorly configured hyperparameters.
-2. We created an overly simplistic dataset that only included examples where `open-mistral-7b` predictions already matched the dataset labels (approximately 75.68% of examples).
+2. We created an overly simplistic dataset that only included examples where `open-mistral-7b` predictions already matched the dataset labels (76.03% of training pairs with the final prompt: 27,066 of 35,597).
 3. After filtering to balance label distribution, we trained on only about 10,000 examples.
 
 **Result:** The model overfit extremely quickly, often within a single epoch, and failed to generalize to more challenging examples. This highlighted the critical importance of data quality and diversity in CoT fine-tuning.
@@ -41,26 +41,26 @@ Our first approach was naive in several ways:
 
 After our initial failure, we conducted a thorough analysis of the generated thought chains. This revealed a striking pattern: the length of the reasoning chain strongly correlated with accuracy.
 
-Specifically, we found:
-- Thought chains between 150-350 tokens showed the highest accuracy
-- Examples with 350-500 tokens still performed well
-- Performance degraded linearly as token count increased beyond 750-1000 tokens
-- Very short examples (0-100 tokens) also performed poorly
+Specifically, on the `open-mistral-7b` rationales for the training and dev pairs (lengths estimated as characters / 4; `scripts/analysis/analyze_original_thoughts.py`):
+- 0-100 tokens: 86.44% agreement with the gold label (686 examples)
+- 101-200 tokens: 80.14% (24,232 examples)
+- 201-300 tokens: 69.50% (10,537 examples)
+- 301+ tokens: 57.16% (2,117 examples)
 
 Manual inspection confirmed that shorter chains were typically "concise, simplistic, logical," while longer ones often exhibited "overthinking" and struggled with subjective examples.
 
-**Action:** We redesigned our prompts to explicitly encourage brevity and structure (typically a 3-step reasoning process). This simple change improved the initial generation accuracy from around 65% to 75.68% without changing the model.
+**Action:** We redesigned our prompts to explicitly encourage brevity and structure (typically a 3-step reasoning process). In my notes at the time this raised agreement with the gold labels from around 65% to around 75% without changing the model; the final prompt's agreement on the training split is 76.03%. The earlier prompt's outputs were not kept, so the 65% figure is not reproducible from the repository.
 
 ### 3. Attempted Solution: LLM-As-A-Judge
 
-With improved thought generation, we still needed to address the approximately 24.32% of examples where our generated thoughts disagreed with dataset labels. Rather than discarding these examples, we explored an automated approach to improve them.
+With improved thought generation, we still needed to address the 23.97% of training examples (8,531 of 35,597) where our generated thoughts disagreed with dataset labels. Rather than discarding these examples, we explored an automated approach to improve them.
 
 We developed an LLM-as-a-judge system that would:
 1. Score the quality of generated thought processes based on coherence, correctness, and alignment with the label
 2. For examples scoring below a threshold, attempt to improve the reasoning through iterative refinement
 3. Recursively apply this process, potentially escalating to stronger models when necessary
 
-**Challenge:** We discovered a stark precision-recall imbalance (approximately 90% precision but only 50% recall), suggesting model bias, labeler bias, or both. Many "no-entailment" examples appeared to be entailed according to both the model's reasoning and our manual verification.
+**Challenge:** We discovered a stark precision-recall imbalance in the teacher's labels on the training split (90.71% precision but 59.58% recall for the entailment class), suggesting model bias, labeller bias, or both. Many "no-entailment" examples appeared to be entailed according to both the model's reasoning and our manual verification.
 
 **Result:** This approach proved prohibitively expensive (costing >£100 for a subset of examples) and often failed to converge on subjective examples. Despite numerous iterations and model upgrades, some premise-hypothesis pairs simply wouldn't yield satisfactory agreement with the dataset label.
 
@@ -90,7 +90,7 @@ Our final fine-tuning dataset combined:
 1. Examples where the initial `open-mistral-7b` generation produced the correct label and reasoning
 2. Examples where the initial generation was incorrect but were corrected through our Reflection-CoT process
 
-This effectively doubled our usable training data compared to our initial approach, improved class balance, and ensured coverage of the full spectrum of examples.
+This raised the usable training data from the 27,066 pairs with a correct initial rationale to all 35,597, restored the gold-label class balance, and ensured coverage of the full spectrum of examples.
 
 ## Fine-Tuning Evolution & Optimization
 
@@ -103,7 +103,7 @@ This effectively doubled our usable training data compared to our initial approa
 
 2. **Second Attempt (Combined Correct + Reflected Data):**
    - The fine-tuning dataset combined initially correct examples with newly generated reflected examples.
-   - **Impact:** This effectively doubled the usable training data, created a more balanced class distribution, and introduced more diverse reasoning paths.
+   - **Impact:** This grew the training file from the correct-only subset to all 35,597 pairs, restored the class balance, and introduced more diverse reasoning paths.
    - **Outcome:** Using the same QLoRA settings, the model showed much better training dynamics, improving well past the first epoch.
 
 3. **Higher Rank Experiments:**
@@ -116,22 +116,22 @@ This effectively doubled our usable training data compared to our initial approa
      - **Increased Effective Batch Size:** To average out noise from diverse examples
      - **Gradient Clipping:** To prevent gradient explosions
      - **Lower Learning Rate:** Tuned for the larger batch size and potential noise
-   - **Outcome:** This stabilized approach with higher rank (`r=32/a=64`) and larger batch size yielded the best results, confirming that the complex reflected dataset benefits from more capacity when properly stabilized.
+   - **Outcome:** This stabilised approach (`ablation2.py`: `r=32/a=64`, effective batch 64, gradient clipping, `lr=1e-4`) trained smoothly and reached 89.33% test accuracy, but did not beat the simpler ablation 1 configuration (`r=16`, effective batch 32, `lr=2e-4`: 89.58%). The lower-learning-rate, 5-epoch variant (`ablation2_best.py`) reached 88.72% on the dev split; it was trained on `train_ft_final.jsonl`, which includes the test pairs, so it has no clean test result. All three configurations ended within 0.35 percentage points of each other on the test set.
 
 ### Sequence Length Optimization: A Double Win
 
 Reducing the maximum sequence length was a key optimization driven by both performance observations and efficiency needs:
 
-1. **Accuracy Correlation:** Analysis revealed that thought chains resulting in a total length of 250-400 tokens showed the highest accuracy (85-95%), while longer chains had slightly lower accuracy (70-80%).
+1. **Accuracy Correlation:** The length analysis above showed agreement with the gold label falling as the teacher's reasoning grew longer; three quarters of reasoning chains are under 196 estimated tokens.
 
 2. **Prompt Refinement for Brevity:** We tuned prompts to encourage concise reasoning by:
    - Adding explicit brevity instructions
    - Requesting exactly 3 reasoning steps, based on analysis of successful examples
    - Making brevity a criterion in scoring and self-improvement prompts
    
-   This refinement itself improved initial thought generation accuracy from ~65% to 75.68%.
+   In my notes this refinement raised agreement with the gold labels from about 65% to about 75%; the final prompt's training-split agreement is 76.03%.
 
-3. **Setting `max_seq_length=512`:** After generating the entire dataset with brevity-focused prompts, we confirmed no example exceeded 400 tokens. This allowed a safe reduction from the default 2048 to 512 tokens.
+3. **Setting `max_seq_length=512`:** After generating the dataset with brevity-focused prompts, the median reasoning chain was 158 estimated tokens and the third quartile 196, so prompt plus rationale fits in 512 tokens for almost every example; the few longer chains (up to about 921 estimated tokens) are truncated by the trainer. This allowed a reduction from the default 2048 to 512 tokens.
 
 4. **The "Double Win":**
    - **Improved Accuracy:** Concise reasoning correlated with higher accuracy
@@ -147,7 +147,7 @@ We encountered significant instability when adjusting parameters like batch size
 - **Batch Size Interaction:** Learning rates suitable for smaller batches became unstable with larger batches without proper adjustment.
 - **Resumption Challenges:** Resuming training often failed to correctly restore the scheduler state, causing learning rate spikes and loss increases.
 
-**Solution:** We shifted from using `warmup_ratio` to specifying fixed `warmup_steps` (around 50-75 for smaller runs, 150 for larger runs). This provided more direct control and made tuning more predictable, especially when resuming training or adjusting duration.
+**Solution:** For a period we switched from `warmup_ratio` to fixed `warmup_steps` (the archived configurations in `train/configs/archive/` use 100), which gave more direct control when resuming or changing duration. The final configurations in `train/configs/` went back to `warmup_ratio` (0.03 to 0.10) once run lengths were fixed, and `train/train_sft.py` only supports `warmup_ratio`.
 
 ### Epoch Count Impact on Training Dynamics
 
@@ -169,7 +169,7 @@ Developing effective prompts involved significant experimentation:
 - **Structuring:** Adoption of Markdown and XML tags to clearly delineate prompt parts.
 - **Output Format:** Enforcing JSON output with few-shot examples in the prompt.
 - **CoT Guidance:** Step-by-step instructions informed by NLI problem-solving strategies.
-- **Experimentation Cost:** Approximately £5 for testing on 1,000 example subset.
+- **Experimentation Cost:** Roughly £5 for testing on a 1,000-example subset (from my notes).
 
 ### Reflection Prompting: Guiding the Stronger Model
 
@@ -186,7 +186,7 @@ We chose Option 2 because:
 
 ### Navigating Label Disagreement
 
-The ~24.32% of examples where model predictions disagreed with dataset labels presented options:
+The 23.97% of training examples where model predictions disagreed with dataset labels presented options:
 
 1. **Keep Original:** Trust the model's reasoning despite disagreeing with the label.
 2. **Omit:** Discard these disagreeing examples entirely.

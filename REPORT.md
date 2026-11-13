@@ -2,7 +2,7 @@
 
 ## Abstract
 
-This paper details fine-tuning Mistral-7B for Natural Language Inference (NLI) using Chain-of-Thought (CoT) reasoning. We introduce Reflection-CoT, a novel data augmentation mechanism targeting label disagreement by using a stronger model (`open-mistral-nemo`, 12B) to correct initial CoT errors. This approach yields accurate, interpretable NLI classifications. Parameter-efficient QLoRA fine-tuning combined with our multi-stage data pipeline balances performance, efficiency, and transparency.
+This paper details fine-tuning Mistral-7B for Natural Language Inference (NLI) using Chain-of-Thought (CoT) reasoning. We introduce Reflection-CoT, a data augmentation mechanism targeting label disagreement by using a stronger model (`open-mistral-nemo`, 12B) to correct initial CoT errors. This approach yields accurate, interpretable NLI classifications. Parameter-efficient QLoRA fine-tuning combined with our multi-stage data pipeline balances performance, efficiency, and transparency.
 
 ## Table of Contents
 1. [Introduction and Motivation](#introduction-and-motivation)
@@ -28,7 +28,7 @@ This paper details fine-tuning Mistral-7B for Natural Language Inference (NLI) u
 5. [Results](#results)
    - 5.1. [Baseline Performance](#baseline-performance)
    - 5.2. [Fine-Tuned Model Performance](#fine-tuned-model-performance)
-   - 5.3. [Benchmarks (If Applicable)](#benchmarks-if-applicable)
+   - 5.3. [Comparison to the Base Model](#53-comparison-to-the-base-model)
    - 5.4. [Thought Quality Assessment](#thought-quality-assessment)
    - 5.5. [Results Summary](#results-summary)
 6. [Discussion](#discussion)
@@ -70,7 +70,7 @@ Our system integrates a multi-stage data augmentation pipeline with parameter-ef
 
 1.  **Multi-Stage Data Augmentation (The Reflection-CoT Pipeline):**
     *   **Stage 1: Initial CoT Generation:** All premise-hypothesis pairs are processed by `open-mistral-7b` to generate an initial CoT and predicted label. This captures the baseline reasoning tendencies of a Mistral-7B class model.
-    *   **Stage 2: Error Identification & Reflection Trigger:** Examples where the initial prediction from Stage 1 mismatches the dataset's ground-truth label are flagged (approx. 24.32% of cases).
+    *   **Stage 2: Error Identification & Reflection Trigger:** Examples where the initial prediction from Stage 1 mismatches the dataset's ground-truth label are flagged (23.97% of training pairs: 8,531 of 35,597).
     *   **Stage 3: Reflection-CoT Generation:** For flagged examples, the `open-mistral-nemo` (12B parameter) model is employed. It receives the premise, hypothesis, the *true label*, and the *original flawed CoT from `open-mistral-7b`*. Its task is to analyze the prior error and generate a corrected CoT that leads to the true label. The use of a more powerful 12B model for reflection is crucial, as this meta-reasoning task (analyzing and correcting another model's complex reasoning) requires greater capacity than the initial CoT generation. This specific contextual input guides `open-mistral-nemo` to produce targeted corrections rather than entirely new, potentially unrelated reasoning paths.
     *   **Stage 4: Final Dataset Assembly:** The fine-tuning dataset is composed of (a) examples correctly processed in Stage 1, and (b) examples corrected through the Reflection-CoT mechanism in Stage 3. This ensures comprehensive coverage and high-quality reasoning paths for all original examples.
 
@@ -89,7 +89,7 @@ Our primary contributions are:
 
 1. The **Reflection-CoT** mechanism: A novel data augmentation approach that addresses label disagreement by providing models with both the correct label and flawed reasoning, enabling targeted correction of logical errors.
 
-2. An empirical analysis of **CoT brevity and effectiveness**: Demonstrating that concise reasoning (150-350 tokens) correlates with higher accuracy for NLI tasks, informing both our prompt engineering and training optimizations.
+2. An empirical analysis of **CoT length and label agreement**: Showing that, in the generated training data, shorter reasoning chains agree with the gold labels more often, which informed both the prompt design and the 512-token training context.
 
 3. A comprehensive case study of **QLoRA fine-tuning for reasoning tasks**: Providing practical insights into hyperparameter selection and training stability for parameter-efficient fine-tuning of reasoning-focused language models.
 
@@ -110,7 +110,7 @@ For the first stage of our pipeline, we used `open-mistral-7b` to generate CoT r
 3. Provide a final binary label (0 for no-entailment, 1 for entailment)
 4. Format the output as JSON: `{"thought_process": "...", "predicted_label": 0|1}`
 
-This process yielded an initial set of CoT examples, approximately 65-70% of which matched the dataset's gold standard labels. We chose Mistral-7B for this stage based on empirical observations that its concise reasoning patterns often aligned better with the dataset's binary labels compared to larger models that sometimes "overthought" examples, particularly for subjective cases.
+This process yielded an initial set of CoT examples, 76.03% of which matched the dataset's gold standard labels on the training split (27,066 of 35,597; `data/original_thoughts/train_thoughts.json`) and 74.86% on the dev split (1,480 of 1,977). We chose Mistral-7B for this stage based on empirical observations that its concise reasoning patterns often aligned better with the dataset's binary labels compared to larger models that sometimes "overthought" examples, particularly for subjective cases.
 
 The choice to capture the base model's "natural" reasoning before any correction was deliberate—it provided a baseline understanding of the model's approach and would potentially minimize friction between the base model and the fine-tuned LoRA adapter by preserving reasoning patterns the model was already comfortable with.
 
@@ -133,7 +133,7 @@ This pre-label alignment is particularly valuable in cases where label subjectiv
 
 #### Reflection on Errors: The Reflection-CoT Mechanism
 
-A core component of our methodology is the **Reflection-CoT mechanism**, designed to address instances where the initial CoT generation by `open-mistral-7b` yielded predictions inconsistent with the provided dataset labels (approximately 24.32% of cases, as noted in experiment logs, `BLOG.md`).
+A core component of our methodology is the **Reflection-CoT mechanism**, designed to address instances where the initial CoT generation by `open-mistral-7b` yielded predictions inconsistent with the provided dataset labels (23.97% of training pairs, 8,531 of 35,597).
 
 **Addressing Label Disagreement & Limitations of Automated Correction:** Initial explorations (detailed in experiment logs, `BLOG.md`) into resolving these disagreements by attempting to automatically guide the model towards the correct label without explicit instruction (i.e., "correct naturally" through iterative self-scoring with stronger models) proved both prohibitively expensive (estimated >£100 in API costs for a subset) and largely ineffective. Models often struggled to find coherent, natural reasoning paths to the target label, reinforcing concerns about dataset label subjectivity and the limitations of purely automated refinement in such scenarios.
 
@@ -143,7 +143,7 @@ A core component of our methodology is the **Reflection-CoT mechanism**, designe
 3.  The **original, flawed thought process** generated by `open-mistral-7b`.
 The model was then explicitly prompted to analyze the initial mistake and generate a corrected reasoning path that logically leads to the true label.
 
-**Rationale for Stronger Model & Contextual Input:** `open-mistral-nemo` (12B) was chosen over the initial 7B model for reflection due to its enhanced reasoning capabilities, deemed necessary for the complex meta-reasoning task of identifying logical flaws in another model's output and constructing a sound, corrective argument. Providing the original flawed reasoning as context was a deliberate design choice aimed at:
+**Rationale for Stronger Model & Contextual Input:** `open-mistral-nemo` (12B) was chosen over the initial 7B model for reflection due to its enhanced reasoning capabilities, deemed necessary for the meta-reasoning task of identifying logical flaws in another model's output and constructing a sound, corrective argument. Providing the original flawed reasoning as context was a deliberate design choice aimed at:
 *   Guiding `open-mistral-nemo` to correct the *specific logical failure* rather than merely generating any valid path to the true label.
 *   Addressing the potential for the reflection model to produce forced or unnatural reasoning if only given the target label, especially given the observed subjectivity of some dataset labels.
 *   Encouraging the reflection model to potentially emulate the concise style of the initial CoT, having seen an example (albeit flawed).
@@ -154,7 +154,7 @@ This process was crucial for systematically handling challenging examples and cr
 Significant effort was invested in prompt design for both generation and reflection:
 *   **Structure:** Utilized Markdown and XML tags for clarity.
 *   **Output Format:** Enforced JSON output (`{"thought_process": "...", "predicted_label": ...}`) using few-shot examples in the prompt.
-*   **CoT Guidance:** Instructions for step-by-step reasoning, refined to encourage brevity and a 3-step structure, which correlated with higher accuracy and efficiency. This refinement itself improved initial CoT accuracy from approximately 65% to 73%, validating our hypothesis about reasoning brevity.
+*   **CoT Guidance:** Instructions for step-by-step reasoning, refined to encourage brevity and a 3-step structure, which correlated with higher accuracy and efficiency. In the experiment notes this refinement raised agreement with the gold labels from roughly 65% to roughly 75%; the final prompt's agreement on the training split is 76.03%. The outputs of the earlier prompt are not in the repository, so the 65% starting point cannot be reproduced from files.
 *   **Reflection Prompt:** Specifically asked the model to analyze the prior (incorrect) thought process and generate a corrected one.
 
 #### Final Dataset Composition and Characteristics
@@ -167,30 +167,30 @@ This strategy aimed to leverage the strengths of both models and ensure the fine
 
 Based on our analysis of the final dataset, we identified the following key characteristics:
 
-1. **Size and Distribution**: The dataset consists of 31,167 total examples, with 28,051 training examples (90.00%), 1,558 validation examples (5.00%), and 1,558 test examples (5.00%). The distribution of labels is well-balanced, with 16,125 entailment examples (51.74%) and 15,042 no-entailment examples (48.26%).
+1. **Size and Distribution**: The labelled data consists of 39,547 pairs: 35,593 training pairs (90.0%), 1,977 validation pairs (5.0%) and 1,977 test pairs (5.0%), in `data/original_data/{train,dev,test}.csv`. No (premise, hypothesis) pair appears in more than one split. Labels are balanced: 20,407 entailment (51.60%) and 19,140 no-entailment (48.40%). The fine-tuning file `data/finetune/train_ft.jsonl` has 35,597 rows (four training pairs appear twice in the generated rationales).
 
-2. **Token Length Analysis**: As shown in Figure 4, the statistical analysis of token lengths revealed:
+2. **Token Length Analysis**: As shown in Figure 3, the reasoning chains are several times longer than the inputs. Lengths are estimated as characters / 4 (`scripts/analysis/analyze_token_lengths.py` over `train_ft.jsonl`, `dev_ft.jsonl` and `test.csv`), not with the Mistral tokenizer:
 
 <div align="center">
-  <img src="metrics/token_count_distribution.png" alt="Token count distribution" width="700"/>
-  <p><em>Figure 4: Distribution of token counts across premises, hypotheses, and reasoning chains in the final dataset, highlighting the significantly longer nature of reasoning compared to input text.</em></p>
+  <img src="metrics/token_lengths.png" alt="Estimated token lengths by component" width="700"/>
+  <p><em>Figure 3: Average estimated token length of premises, hypotheses and reasoning chains, with the distribution of reasoning-chain lengths inset.</em></p>
 </div>
 
-| Component | Average Tokens | Min | Max | Median | 1st Quartile | 3rd Quartile |
-|-----------|----------------|-----|-----|--------|--------------|--------------|
-| Premise | 26.87 | 0 | 340 | 23.00 | 14.00 | 36.00 |
-| Hypothesis | 14.51 | 0 | 71 | 13.00 | 9.00 | 18.00 |
-| Reasoning Chain | 164.54 | 4 | 921 | 153.00 | 125.00 | 191.00 |
+| Component | Average (est. tokens) | Min | Max | Median | 1st Quartile | 3rd Quartile |
+|-----------|----------------------:|----:|----:|-------:|-------------:|-------------:|
+| Premise | 26.88 | 0 | 340 | 23 | 14 | 36 |
+| Hypothesis | 14.51 | 0 | 71 | 13 | 9 | 18 |
+| Reasoning Chain | 168.39 | 4 | 921 | 158 | 128 | 196 |
 
-3. **Reflection Impact**: Approximately 24.32% of the dataset consists of examples with corrected reasoning through the Reflection-CoT mechanism. This substantial portion highlights the importance of our reflection process in creating a comprehensive training set that addresses challenging cases where the initial reasoning was flawed.
+3. **Reflection Impact**: 23.97% of the training file (8,531 of 35,597 rows) carries reasoning rewritten through the Reflection-CoT mechanism; the remaining 76.03% keeps the original `open-mistral-7b` reasoning.
 
-4. **Thought Quality Distribution**: Analysis of the reasoning chains indicates that most (approximately 65%) fall in the "medium length" category (101-200 tokens). This aligns with our prompt engineering focus on encouraging concise, structured reasoning.
+4. **Thought Length Distribution**: 64.5% of the original reasoning chains (24,232 of 37,574 train and dev rationales) fall in the 101-200 estimated-token range, consistent with the prompt's emphasis on three concise steps.
 
 The dataset composition deliberately balances between preserving the model's natural reasoning patterns (from correct initial generations) and learning from corrected errors (via the Reflection-CoT mechanism), creating a rich training resource for interpretable NLI.
 
 <div align="center">
   <img src="metrics/dataset_statistics.png" alt="Dataset composition and statistics" width="700"/>
-  <p><em>Figure 5: Composition of the final dataset showing distribution by data source (original vs. reflection-corrected) and label balance.</em></p>
+  <p><em>Figure 4: Composition of the final dataset showing distribution by data source (original vs. reflection-corrected) and label balance.</em></p>
 </div>
 
 ### 2.2. Model Architecture & Fine-Tuning Strategy
@@ -216,12 +216,9 @@ QLoRA was employed for fine-tuning to manage memory constraints.
 
 The implementation of QLoRA follows the architecture described in Dettmers et al. (2023), with the base model layers quantized to 4-bit precision and the trainable LoRA adapters injected into the attention mechanism. This hybrid approach maintains the knowledge encoded in the base model while allowing targeted adaptation of reasoning capabilities.
 
-![Diagram of QLoRA architecture showing quantized model weights with low-rank adaptation matrices.](figures/QLoRA.png)
-*Figure 2: QLoRA architecture combining 4-bit quantization of the base model weights with trainable low-rank adaptation matrices (A and B). This enables parameter-efficient fine-tuning by only updating a small fraction of the parameters while preserving the knowledge in the base model.*
-
 <div align="center">
-  <img src="metrics/QLoRA.png" alt="Model architecture showing QLoRA approach" width="700"/>
-  <p><em>Figure 3: Overall architecture of our fine-tuning approach, integrating QLoRA with the Mistral-7B model for the NLI task.</em></p>
+  <img src="figures/QLoRA.png" alt="Diagram of QLoRA architecture showing quantized model weights with low-rank adaptation matrices" width="600"/>
+  <p><em>Figure 5: QLoRA combines 4-bit quantization of the base model weights with trainable low-rank adaptation matrices (A and B), so only a small fraction of the parameters is updated.</em></p>
 </div>
 
 ### 2.3. Training Environment and Hyperparameters
@@ -234,12 +231,12 @@ To ensure consistency and reproducibility across different hardware environments
 
 *   **Epochs:** Typically 2-5, with early stopping based on validation loss plateauing for 3 consecutive evaluations.
 *   **Batch Size:** Effective batch sizes varied (e.g., 16, 32, 64) using `per_device_train_batch_size` and `gradient_accumulation_steps`.
-*   **Learning Rate:** Our best results came with `2e-4` or `5e-5` (depending on batch size), with a cosine learning rate scheduler and warmup. Higher learning rates were tested (up to `5e-4`), but led to training instability, while lower rates (below `1e-5`) resulted in slower convergence without performance benefits.
-    *   **Warmup Strategy:** Fixed `warmup_steps` (e.g., 50-150, as noted in experiment logs, `BLOG.md`) were preferred over `warmup_ratio`. This decision was based on observed instabilities when `warmup_ratio` interacted with varying total training steps (due to changes in epochs or batch sizes) and challenges in correctly restoring learning rate scheduler states upon resumption of training, which could lead to inappropriate learning rate spikes (`BLOG.md`). Fixed steps provided more predictable and reproducible control over the initial learning phase.
+*   **Learning Rate:** The configurations in `train/configs/` use `2e-4` (ablations 0 and 1, effective batch 16 and 32), `1e-4` (`ablation2.py`, effective batch 64) and `5e-5` (`ablation2_best.py`), each with a cosine schedule and warm-up. The best test result came from `2e-4` at effective batch 32.
+    *   **Warmup Strategy:** The final configurations specify warm-up as a ratio of total steps (`warmup_ratio` 0.03 for ablations 0 and 1, 0.10 and 0.05 for the two ablation 2 configurations); `train/train_sft.py` passes it straight to the trainer. Fixed `warmup_steps` were tried in earlier runs (see `train/configs/archive/`) after warm-up interacted badly with changes to epoch count and with resuming from checkpoints, as described in `BLOG.md`.
 *   **Optimizer:** `paged_adamw_8bit` was used for memory efficiency.
-*   **Sequence Length Optimization:** `max_seq_length` was set to 512 tokens. This decision was a crucial post-analysis optimization (experiment logs, `BLOG.md`). After generating the full CoT dataset using brevity-focused prompts, analysis confirmed that no generated example exceeded 400 tokens. Setting `max_seq_length=512` thus safely accommodated all generated CoTs while dramatically reducing computational load (due to quadratic scaling of attention) and GPU VRAM requirements. This optimization was instrumental in enabling the exploration of other hyperparameters (e.g., larger batch sizes, higher LoRA ranks) and achieved a "double win": improved potential accuracy through concise reasoning and significant efficiency gains.
+*   **Sequence Length:** `max_seq_length` was set to 512 tokens after the length analysis of the generated rationales. Three quarters of reasoning chains are under 196 estimated tokens and the median is 158, so prompt plus rationale fits in 512 tokens for almost all examples; the few longer chains (the longest is about 921 estimated tokens) are truncated by the trainer. The shorter context reduces attention cost and memory, which made larger batch sizes and higher LoRA ranks possible on a 24 GB GPU.
 *   **BF16 Handling:** An `autocast` wrapper around the model's forward pass was used to mitigate dtype mismatches when using `bfloat16` precision with gradient checkpointing.
-*   **Gradient Checkpointing:** Enabled in most configurations to save memory by recomputing activations during the backward pass. This optimization reduced peak memory usage by approximately 30% at the cost of about 20% slower training, a worthwhile trade-off given our GPU memory constraints. Without gradient checkpointing, even basic configurations would have exceeded our available 24GB VRAM.
+*   **Gradient Checkpointing:** Enabled in `ablation1_best.py` and both ablation 2 configurations to save memory by recomputing activations during the backward pass, at the cost of slower steps. Ablation 0 and `ablation1.py` run without it.
 
 ## 3. Experiment I - Evolution of Data Augmentation Strategy
 
@@ -249,9 +246,9 @@ This section details our iterative journey to develop an effective data augmenta
 
 Our first approach to fine-tuning was naive in several ways. We used a pre-quantized GPTQ version of Mistral-7B with poorly configured hyperparameters and an overly simplistic dataset. This initial dataset suffered from multiple limitations:
 
-1. **Limited Coverage:** We only used examples where `open-mistral-7b` predictions already matched the dataset labels (approximately 65-70% of examples), discarding challenging cases.
+1. **Limited Coverage:** We only used examples where `open-mistral-7b` predictions already matched the dataset labels (76.03% of the training pairs with the final prompt), discarding challenging cases.
 
-2. **Data Reduction:** After further filtering to balance label distribution, we trained on only about 10,000 examples.
+2. **Data Reduction:** After further filtering to balance label distribution, we trained on only about 10,000 examples (from the experiment notes; this intermediate file is not in the repository).
 
 3. **Confirmation Bias:** By only including examples the model already handled correctly, we reinforced existing patterns without addressing blind spots.
 
@@ -261,50 +258,40 @@ The result was predictable: the model overfit extremely quickly, often within a 
 
 After our initial failure, we conducted a thorough analysis of the generated thought chains to understand patterns in high-performing versus low-performing examples. This analysis revealed an interesting correlation: the length of the reasoning chain appeared to be strongly associated with accuracy.
 
-Specifically, we observed:
-- Thought chains between 150-350 tokens showed higher accuracy
-- Examples with 350-500 tokens still performed relatively well
-- Performance appeared to decline as token count increased beyond 750-1000 tokens
-- Very short examples (0-100 tokens) also showed lower performance
-
-This pattern suggested a potential insight: concise, focused reasoning might be more likely to arrive at the correct label according to the dataset. Manual inspection seemed to support this observation, revealing that shorter chains were typically "concise, simplistic, logical," while longer ones often exhibited patterns that could be characterized as "overthinking" and seemed to struggle with examples that had subjective elements.
+Specifically, on the `open-mistral-7b` rationales for the training and dev pairs, agreement with the gold label falls steadily as the reasoning gets longer: from 86% for chains under 100 estimated tokens to 57% for chains over 300 (table below). Manual inspection supported this: shorter chains were typically "concise, simplistic, logical", while longer ones often showed "overthinking" and struggled with examples that had subjective elements.
 
 #### Quantitative Analysis of Reasoning Length vs. Accuracy
 
-To quantify this potential relationship, we conducted an analysis of reasoning chains from our initial data generation. As shown in Figure 6, the data suggested a correlation between token length and accuracy:
+To quantify this relationship we bucketed the `open-mistral-7b` rationales for the 37,574 training and dev pairs by estimated length (characters / 4) and measured agreement with the gold label in each bucket (`scripts/analysis/analyze_original_thoughts.py`, output in `metrics/original_token_vs_accuracy.json`). Figure 6 and the table show the result:
 
 <div align="center">
-  <img src="metrics/thought_length_vs_accuracy.png" alt="Reasoning Chain Length vs. Accuracy" width="700"/>
-  <p><em>Figure 6: Analysis showing the observed relationship between token length and accuracy. The scatter plot indicates raw accuracy points, while the trend line shows an apparent inverse relationship between length and accuracy beyond a certain range. It's important to note that this correlation doesn't necessarily imply causation.</em></p>
+  <img src="metrics/original_token_vs_accuracy.png" alt="Reasoning chain length versus agreement with gold label, open-mistral-7b rationales" width="700"/>
+  <p><em>Figure 6: Agreement between the `open-mistral-7b` label and the gold label by estimated reasoning-chain length, training and dev pairs. The correlation does not establish causation: harder examples may both provoke longer reasoning and be mislabelled more often.</em></p>
 </div>
 
-The statistical breakdown showed:
+| Estimated token range | Examples | Agreement with gold | Observation from manual inspection |
+|-----------------------|---------:|--------------------:|------------------------------------|
+| 0-100 | 686 (1.8%) | 86.44% | Short, direct chains |
+| 101-200 | 24,232 (64.5%) | 80.14% | Typical three-step reasoning |
+| 201-300 | 10,537 (28.0%) | 69.50% | Reasoning starts to drift |
+| 301+ | 2,117 (5.6%) | 57.16% | Overthinking, tangential reasoning |
 
-| Token Range | Examples | Accuracy | Key Characteristics |
-|-------------|----------|----------|---------------------|
-| 0-100 | 667 (2.25%) | 86.06% | Often too simplistic, missing nuance |
-| 101-200 | 19,603 (66.21%) | 79.34% | Apparent balance of reasoning steps |
-| 201-300 | 7,784 (26.29%) | 68.99% | Beginning to show reasoning drift |
-| 301+ | 1,553 (5.25%) | 56.79% | Potential overthinking, tangential reasoning |
-
-This analysis indicated a potential inflection point around 200-300 tokens, beyond which each additional 100 tokens corresponded to approximately a 10-12 percentage point drop in accuracy. The overall accuracy across all examples was 75.59%, but this varied considerably based on length.
-
-> Note: These statistics represent findings from our analysis of the initially generated thoughts, which informed our approach to training even though our current dataset is a subset of this original analysis dataset.
+Each additional 100 estimated tokens beyond the first bucket corresponds to a drop of roughly 10 percentage points in agreement. Agreement over all 37,572 scored rationales is 75.98%.
 
 It's important to note that while we observed this correlation consistently across experiments, we cannot definitively conclude a causal relationship. Other factors may influence both reasoning length and accuracy, such as example complexity, topic domain, or inherent ambiguity in the task. This area would benefit from further controlled research.
 
-Nevertheless, the observed pattern was consistent enough to inform our approach. Based on this analysis, we redesigned our prompts to encourage brevity and structure (typically a 3-step reasoning process). This change appeared to have a positive impact, improving the initial generation accuracy from around 65% to 75.68% without changing the underlying model. This insight would later inform our choice of `max_seq_length=512` for fine-tuning, creating efficiency gains while potentially supporting more effective reasoning patterns.
+Nevertheless, the observed pattern was consistent enough to inform our approach. Based on this analysis, we redesigned our prompts to encourage brevity and structure (typically a 3-step reasoning process). In the experiment notes this raised agreement with the gold labels from roughly 65% to roughly 75% without changing the model; the final prompt's agreement on the training split is 76.03% (the earlier prompt's outputs are not in the repository). This insight later informed the choice of `max_seq_length=512` for fine-tuning.
 
 ### LLM-As-A-Judge: Iterative Self-Critique & Improvement
 
-With improved thought generation in place, we still needed to address the approximately 24.32% of examples where our generated thoughts disagreed with dataset labels. Rather than simply discarding these examples, we explored an automated approach to improve them.
+With improved thought generation in place, we still needed to address the 23.97% of training examples (8,531) where our generated thoughts disagreed with dataset labels. Rather than simply discarding these examples, we explored an automated approach to improve them.
 
 We developed an LLM-as-a-judge system (implemented in `scripts/score_thoughts.py`) that would:
 1. Score the quality of a generated thought process based on criteria such as coherence, correctness, and alignment with the label
 2. For examples scoring below a threshold, attempt to improve the reasoning through iterative refinement
 3. Recursively apply this process, potentially escalating to stronger models when necessary
 
-This approach revealed a significant challenge: in our dataset, there was a stark precision-recall imbalance (approximately 90% precision but only 50% recall). This suggested either model bias, labeler bias, or both—many "no-entailment" examples in the dataset appeared to be entailed according to both the model's reasoning and our manual verification.
+This approach revealed a significant challenge: the `open-mistral-7b` labels had a stark precision-recall imbalance on the training split (for the entailment class, 90.71% precision but 59.58% recall: 10,927 true positives, 1,119 false positives, 7,412 false negatives, 16,139 true negatives). The model under-predicted entailment relative to the gold labels, and many of the disagreements looked, on manual inspection, like pairs the model had reasonably judged.
 
 While promising in concept, this self-improvement approach proved prohibitively expensive (costing >£100 for a subset of examples) and often failed to converge on subjective examples. Despite numerous iterations and model upgrades, some premise-hypothesis pairs simply wouldn't yield a satisfactory agreement with the dataset label.
 
@@ -343,12 +330,7 @@ Our final fine-tuning dataset combined:
 1. Examples where the initial `open-mistral-7b` generation produced the correct label and reasoning
 2. Examples where the initial generation was incorrect but were corrected through our Reflection-CoT process (using `open-mistral-nemo`, 12B)
 
-This approach effectively doubled our usable training data compared to our initial naive approach, improved class balance, and ensured coverage of the full spectrum of examples, including challenging edge cases.
-
-<div align="center">
-  <img src="metrics/dataset_distribution.png" alt="Distribution of examples in the final dataset" width="700"/>
-  <p><em>Figure: Distribution of examples in the final dataset, showing balanced representation of entailment and non-entailment cases.</em></p>
-</div>
+This approach raised the usable training data from the 27,066 pairs whose initial rationale was correct to all 35,597, restored the gold-label class balance, and ensured coverage of the full spectrum of examples, including the challenging ones.
 
 ## 4. Experiment II - Fine-Tuning with QLoRA
 
@@ -376,7 +358,7 @@ Building on the quantized model, we implemented Low-Rank Adaptation (LoRA) to fu
 2. **Rank and Alpha:** We experimented with different rank values (typically `r=16` or `r=32`) and scaling factors (`lora_alpha=32` or `lora_alpha=64`), finding that higher ranks were beneficial for capturing the complexity introduced by our reflection data.
 3. **Dropout:** A small dropout value (`lora_dropout=0.05`) was applied for regularization.
 
-This QLoRA approach allowed us to fine-tune the model while updating only 0.1-0.2% of the parameters, dramatically reducing computational requirements while maintaining performance.
+With adapters on the four attention projections of all 32 layers, rank 16 adds about 13.6M trainable parameters (0.19% of the 7.25B base) and rank 32 about 27.3M (0.38%).
 
 #### Mathematical Formulation of QLoRA
 
@@ -426,179 +408,144 @@ We conducted several ablation studies to identify optimal training parameters:
 1. **Batch Size and Learning Rate:**
    - **Ablation 0 (Small Batch):** Effective batch size 16, `lr=2e-4`, 2 epochs
    - **Ablation 1 (Medium Batch):** Effective batch size 32, `lr=2e-4`, 2 epochs, with gradient checkpointing
-   - **Ablation 2 (Large Capacity/Batch):** Effective batch size 64, `lr=5e-5`, 5 epochs, with gradient clipping at 1.0
+   - **Ablation 2 (Large Capacity/Batch):** Effective batch size 64, LoRA rank 32, gradient clipping at 1.0. `ablation2.py` uses `lr=1e-4` for 3 epochs; `ablation2_best.py` lowers this to `lr=5e-5` for 5 epochs.
 
-2. **Sequence Length:** Based on our token analysis, we set `max_seq_length=512`, which safely accommodated all generated CoT examples (maximum observed length <400 tokens) while significantly reducing computation time and memory usage.
+2. **Sequence Length:** Based on our token analysis, we set `max_seq_length=512` in every configuration (see Section 2.3).
 
-3. **Warmup Strategy:** We found that fixed `warmup_steps` (ranging from 50-150) provided better stability than ratio-based warmup, particularly when resuming training or adjusting training duration.
+3. **Warmup Strategy:** The final configurations use `warmup_ratio` (0.03 to 0.10); fixed `warmup_steps` were tried in earlier archived configurations when resuming and re-scheduling runs proved fragile.
 
-The key hyperparameters for our best-performing configuration (Ablation1_Best) were:
+The key hyperparameters for our best-performing configuration (`train/configs/ablation1_best.py`) are:
 
 | Parameter | Value | Notes |
 |-----------|-------|-------|
-| lora_r | 16 | Balanced rank for capturing reasoning patterns |
-| lora_alpha | 32 | Set to 2*r for proper scaling |
-| lora_dropout | 0.05 | Light regularization |
-| learning_rate | 2e-4 | Higher LR for medium batch size |
-| per_device_train_batch_size | 4 | Hardware limitation |
-| gradient_accumulation_steps | 8 | For effective batch size of 32 |
-| warmup_steps | 50 | Fixed steps for stable warm-up |
-| max_steps | 2000 | Approximately 2 epochs |
-| eval_steps | 250 | Regular validation |
-| save_steps | 250 | Regular checkpointing |
-| gradient_checkpointing | True | Memory optimization |
-| bf16 | True | Memory efficiency |
-| optim | paged_adamw_8bit | Memory efficiency |
-| max_seq_length | 512 | Optimal for reasoning length |
+| lora_r | 16 | Rank of the adapter matrices |
+| lora_alpha | 32 | Set to 2*r |
+| lora_dropout | 0.05 | Light regularisation |
+| target_modules | q_proj, k_proj, v_proj, o_proj | Set in `train/train_sft.py` |
+| learning_rate | 2e-4 | Cosine schedule |
+| batch_size (per device) | 16 | |
+| grad_accumulation_steps | 2 | Effective batch size 32 |
+| num_epochs | 2 | 2,224 optimiser steps on `train_ft.jsonl` |
+| warmup_ratio | 0.03 | |
+| weight_decay | 0.01 | |
+| max_grad_norm | None | No gradient clipping |
+| eval_steps / save_steps | 250 | Early stopping with patience 3 on `eval_loss`; best checkpoint kept |
+| gradient_checkpointing | True | |
+| bf16 | True | Set in `train/train_sft.py` |
+| optim | paged_adamw_8bit | Set in `train/train_sft.py` |
+| max_seq_length | 512 | |
 
-For comparison, our Ablation2 configuration explored a longer training duration with a larger effective batch size (64) and lower learning rate (5e-5), achieving slightly lower but still strong performance (89.33% accuracy).
+The training log of the run behind the published ablation 1 result (`mistral-thinking-default-epochs2`, in the Hugging Face repository `jd0g/Mistral-7B-NLI-v0.3`) matches this configuration: 1,112 optimiser steps per epoch at per-device batch 16 and 2 accumulation steps over the 35,597-row `train_ft.jsonl`, peak learning rate 2e-4 reached at about 3% of 2,224 steps.
+
+For comparison, the ablation 2 test result (89.33% accuracy) comes from the `ablation2.py` run (`mistral-thinking-abl3`: effective batch 64, `lr=1e-4`, 3 epochs). The `ablation2_best.py` run (`mistral-thinking-abl3-final`, `lr=5e-5`, 5 epochs) was trained on `train_ft_final.jsonl`, which includes the test pairs, so it is reported only on the dev split (88.72% accuracy). The ablation 0 (`mistral-thinking-abl0-ext`) and ablation 2 (`mistral-thinking-abl3`) logs show about 27,200 training rows per epoch rather than 35,597; that intermediate training file is not in the public dataset.
 
 ## 5. Results
 
 ### 5.1. Baseline Performance
 
-The baseline Mistral-7B model (pretrained `mistralai/Mistral-7B-v0.3` without instruction fine-tuning) demonstrated significantly lower performance on NLI tasks, with an overall accuracy of only 53.77% on the test set. The complete performance metrics for the baseline model were:
+All test-set results in this section are on the 1,977-pair held-out split `data/original_data/test.csv`, which shares no (premise, hypothesis) pair with the training or dev data. Precision, recall and F1 are macro-averaged over the two classes. The per-example predictions are in the public dataset `jd0g/nlistral-7b-results`, and `scripts/analysis/compute_test_metrics.py` recomputes every number below from them.
+
+The baseline is `mistralai/Mistral-7B-v0.3` without any fine-tuning, prompted zero-shot with the same instruction used for fine-tuning (`results/mistral-base-test-labelled.json`):
 
 | Metric | Value |
-|--------|-------|
+|--------|------:|
 | Accuracy | 53.77% |
-| Precision | 60.49% |
-| Recall | 52.32% |
-| F1 Score | 41.51% |
+| Precision (macro) | 60.49% |
+| Recall (macro) | 52.32% |
+| F1 (macro) | 41.51% |
+| MCC | 0.099 |
 
-It's important to note that this baseline model struggled to consistently generate valid JSON output, requiring fallback parsing strategies to extract predictions in many cases. The low F1 score relative to accuracy suggests that the model's predictions were not well-balanced across classes.
+The base model rarely produced the requested JSON, so predictions were extracted with fallback rules (1,681 of 1,977 labels came from an "entailed" phrase in the text rather than from JSON). It predicted entailment for 1,861 of the 1,977 pairs (94%), which is why its macro-F1 is far below its accuracy and its MCC is close to zero.
 
-#### Comparison with Mistral-7B-Instruct
-
-In early experiments, we also evaluated the performance of Mistral-7B-Instruct with extensive prompt engineering and single-shot examples. This approach yielded substantially higher performance (76.0% accuracy, 69.8% F1 score) than the raw pretrained model. However, we consider this an inappropriate baseline for measuring the impact of our fine-tuning approach for several reasons:
-
-1. It uses a model that has already undergone instruction tuning rather than the base pretrained model
-2. It relies on carefully engineered prompts with examples rather than a zero-shot approach
-3. It creates an artificial comparison that understates the true impact of our fine-tuning work
-
-For transparency, we include these results as a reference point, but all improvement calculations in this paper are based on the true zero-shot performance of the pretrained Mistral-7B-v0.3 model (53.77% accuracy) as the baseline.
-
-#### Chain Length and Accuracy
-
-Analysis of the initially generated thoughts revealed a significant correlation between reasoning chain length and accuracy:
-
-- **Short thoughts (0-100 tokens)**: 86.06% accuracy (667 examples)
-- **Medium thoughts (101-200 tokens)**: 79.34% accuracy (19,603 examples)
-- **Long thoughts (201-300 tokens)**: 68.99% accuracy (7,784 examples)
-- **Very long thoughts (301+ tokens)**: 56.79% accuracy (1,553 examples)
-
-> Note: These statistics represent findings from our analysis of the initially generated thoughts, which informed our approach to training even though our current dataset is a subset of this original analysis dataset.
-
-This pattern suggests that as reasoning chains become longer, the baseline model becomes more prone to errors, with accuracy declining precipitously for very long chains. This finding helped inform our fine-tuning approach, particularly our focus on concise reasoning.
+The `open-mistral-7b` API model used to generate the training rationales is a different reference point: with the final generation prompt it agreed with the gold label on 76.03% of training pairs (Section 3.3). That figure is a training-split agreement rate for the data-generation stage, not a test-set baseline, and is not used in the improvement calculations below.
 
 ### 5.2. Fine-Tuned Model Performance
 
-Our fine-tuned model variants demonstrated significant improvements over the baseline, particularly in handling medium to long reasoning chains. The performance metrics across our ablation studies were:
+The three fine-tuned configurations all land within 0.35 percentage points of each other on the test set:
 
-| Model | Accuracy | Precision | Recall | F1 Score |
-|-------|----------|-----------|--------|----------|
-| Ablation0_Best | 89.23% | 89.21% | 89.25% | 89.22% |
-| Ablation1_Best | 89.58% | 89.57% | 89.58% | 89.57% |
-| Ablation2_Best | 89.33% | 89.38% | 89.27% | 89.30% |
+| Model | Config | Training run (results file `model` field) | Accuracy | Precision | Recall | F1 | MCC |
+|-------|--------|--------------------------------------------|---------:|----------:|-------:|---:|----:|
+| Ablation 0 | `ablation0_best.py` | `mistral-thinking-abl0-ext` | 89.23% | 89.21% | 89.25% | 89.22% | 0.785 |
+| Ablation 1 | `ablation1_best.py` | `mistral-thinking-default-epochs2` | 89.58% | 89.57% | 89.58% | 89.57% | 0.791 |
+| Ablation 2 | `ablation2.py` | `mistral-thinking-abl3` | 89.33% | 89.38% | 89.27% | 89.30% | 0.786 |
 
-The Ablation1_Best model, with its medium batch size (32) and carefully tuned learning rate (`2e-4`), achieved the best overall performance. This represents a 35.81 percentage point improvement over the baseline model's accuracy. The consistent performance across all three ablations (all achieving approximately 89-90% accuracy) demonstrates the robustness of our Reflection-CoT data generation pipeline and fine-tuning approach.
+Ablation 1 (effective batch 32, `lr=2e-4`, rank 16) is the best configuration, 35.81 percentage points above the base model's accuracy. The closeness of the three results suggests that, within the ranges tried, the data mattered more than the batch size, learning rate or adapter rank. On the dev split the ordering differs slightly (ablation 0 89.07%, ablation 1 88.77%, `ablation2_best.py` 88.72%), so the differences between configurations should not be over-read.
 
 #### Training Dynamics
 
-The training dynamics of our models revealed important patterns about the fine-tuning process. As shown in Figure 7, the models exhibited different convergence behaviors based on their hyperparameter configurations:
+Figure 8 plots the validation metrics logged by the trainer every 250 steps (`trainer_state.json` in the public repository `jd0g/Mistral-7B-NLI-v0.3`, drawn by `scripts/analysis/plot_training_dynamics.py`). The accuracy shown is the trainer's mean token accuracy on the dev file, not classification accuracy.
 
 <div align="center">
-  <img src="metrics/training_dynamics.png" alt="Training dynamics of model ablations" width="700"/>
-  <p><em>Figure 7: Training dynamics for different model configurations, showing validation loss and accuracy during fine-tuning. While Ablation1 achieved the highest overall accuracy, the extended training of Ablation2 (5 epochs) demonstrated interesting optimization characteristics, maintaining low validation loss without overfitting.</em></p>
+  <img src="metrics/training_dynamics.png" alt="Validation loss and token accuracy during training for the three runs" width="800"/>
+  <p><em>Figure 8: Validation loss (left) and validation mean token accuracy (right) for the three runs behind the test results. Ablation 0 took 3,402 steps for 2 epochs at effective batch 16; ablation 1 took 2,224 steps for 2 epochs at effective batch 32; ablation 2 took 1,275 steps for 3 epochs at effective batch 64.</em></p>
 </div>
 
-Several key observations from the training process:
+Observations from the logs:
 
-1. **Convergence rate**: The smaller batch configurations (Ablation0, Ablation1) converged more rapidly in terms of training steps, with Ablation1 reaching higher final accuracy despite showing some variance in validation metrics.
+1. **Convergence**: Validation loss falls from about 0.73-0.75 at step 250 to 0.69-0.70 at the end of each run (ablation 0: 0.753 to 0.699; ablation 1: 0.737 to 0.691; ablation 2: 0.726 to 0.699). Most of the drop happens in the first third of each run.
 
-2. **Loss stability**: Ablation2, with its lower learning rate (5e-5) and larger batch size (effective batch 64), demonstrated more stable loss curves with fewer oscillations, indicating more reliable gradient updates and a smoother optimization trajectory, though this stability did not translate to higher final accuracy than Ablation1.
+2. **Effect of effective batch size**: Per optimiser step, the larger-batch runs reach a given loss sooner, as expected; per example seen, the three runs are close.
 
-3. **Generalization**: Despite training for more epochs (5 epochs vs 2 epochs for others), Ablation2 maintained consistently decreasing validation loss without signs of overfitting, suggesting that the model continued to improve its reasoning capabilities over more update steps without memorizing the training data.
+3. **No overfitting within two to three epochs**: Validation loss is still flat or falling at the last evaluation of each run; early stopping (patience 3) never triggered.
 
-4. **Initial performance**: All configurations showed substantial improvements within the first 1000 steps, achieving approximately 80-85% accuracy early in training, with more gradual refinements in the later stages of training.
+4. **Token accuracy**: Mean token accuracy on the dev file rises from about 81.4-82.0% to 82.6-82.7%. Small changes in this metric correspond to large changes in label accuracy because most tokens are rationale text that is already predicted well.
 
-These dynamics support our hyperparameter choices for Ablation1 as our best-performing model and demonstrate that parameter-efficient fine-tuning with appropriately chosen learning rates and batch sizes can achieve high-quality results with relatively modest computational resources.
+### 5.3. Comparison to the Base Model
 
-### 5.3. Comparison to Default Prompting
-
-While comprehensive benchmarks against other NLI approaches were beyond the scope of this study, we compared our fine-tuned models against the baseline pretrained Mistral-7B-v0.3 model. It's important to note that our previous benchmarks had compared against Mistral-7B-Instruct with extensive prompt engineering and single-shot examples, which produced artificially high baseline results. The true zero-shot performance of the pretrained model is substantially lower (53.77% accuracy), making our fine-tuning improvements even more significant.
+Comprehensive benchmarks against other NLI systems were beyond the scope of this study; the comparison is between the fine-tuned adapters and the same base model prompted zero-shot.
 
 #### Classification Performance Analysis
 
-Our analysis of the fine-tuned model performance revealed several important improvements over both the base Mistral-7B-v0.3 model and the Mistral-7B-Instruct model with prompt engineering:
+The fine-tuned models improve over the base Mistral-7B-v0.3 model in several ways:
 
 1. **Consistent Output Format**: While the base model frequently struggled to produce valid JSON output (requiring fallback parsing strategies), our fine-tuned model consistently generated well-structured outputs with proper reasoning chains and clear predictions.
 
-2. **Balanced Performance**: The fine-tuned model demonstrated balanced performance across precision and recall metrics (both around 89.6%), addressing the significant imbalance observed in both baseline models. This suggests that our Reflection-CoT approach successfully taught the model to evaluate evidence more systematically rather than defaulting to either over-prediction or under-prediction of entailment.
+2. **Balanced Performance**: The fine-tuned model has balanced precision and recall (both about 89.6% macro), where the base model predicted entailment for 94% of pairs. The training data taught the model to evaluate evidence rather than default to one label.
 
 3. **Reasoning Coherence**: Qualitative analysis of the outputs revealed substantially improved reasoning structure in the fine-tuned model. Where the base model often produced disjointed or circular reasoning that failed to arrive at a logical conclusion, our fine-tuned model demonstrated more structured, coherent reasoning patterns with clear progression from premises to conclusions.
 
-4. **Zero-Shot Capability**: Unlike the Mistral-7B-Instruct approach, which required carefully engineered prompts with examples to achieve reasonable performance, our fine-tuned model performed at a high level without requiring any examples or special prompting. This indicates a more fundamental improvement in the model's reasoning capabilities rather than mere adaptation to specific prompt formats.
+4. **No Few-Shot Examples Needed**: The fine-tuned model is evaluated with the bare instruction and no examples, the same prompt used for the base model.
 
-These improvements highlight the effectiveness of our approach not only in improving raw accuracy but also in enhancing the overall quality, reliability, and usability of the model's outputs. The consistent performance across different ablation studies further demonstrates the robustness of our Reflection-CoT mechanism in generating high-quality training data.
+These improvements show up not only in accuracy but in the reliability and usability of the outputs. The consistency across the three configurations suggests the training data, rather than a particular hyperparameter setting, drives the result.
 
 #### Performance Metrics Summary
 
-The comprehensive metrics for our models compared to both baselines are summarized below:
+Base model versus the best fine-tuned configuration (ablation 1) on the 1,977-pair test set:
 
-| Metric | Base Mistral-7B | Mistral-7B-Instruct* | Fine-tuned Model | Relative Improvement** |
-|--------|----------------|-------------------|------------------|----------------------|
-| Accuracy | 53.77% | 76.0% | 89.58% | +66.60% |
-| Precision | 60.49% | 89.7% | 89.57% | +48.07% |
-| Recall | 52.32% | 57.2% | 89.58% | +71.21% |
-| F1 Score | 41.51% | 69.8% | 89.57% | +115.78% |
+| Metric | Base Mistral-7B-v0.3 (zero-shot) | Fine-tuned (ablation 1) | Absolute change | Relative change |
+|--------|---------------------------------:|------------------------:|----------------:|----------------:|
+| Accuracy | 53.77% | 89.58% | +35.81 pp | +66.60% |
+| Precision (macro) | 60.49% | 89.57% | +29.08 pp | +48.07% |
+| Recall (macro) | 52.32% | 89.58% | +37.26 pp | +71.21% |
+| F1 (macro) | 41.51% | 89.57% | +48.06 pp | +115.78% |
+| MCC | 0.099 | 0.791 | +0.692 | – |
 
-*Mistral-7B-Instruct with extensive prompt engineering and single-shot examples  
-**Relative improvement calculated against the Base Mistral-7B model
-
-The improvements are substantial across all metrics, with the most dramatic enhancement in F1 score (+115.78% relative improvement), indicating that our fine-tuned model not only achieves higher overall accuracy but also maintains much better balance in its predictions. The remarkable improvement in recall (+71.21% relative) demonstrates that our Reflection-CoT approach was particularly effective at addressing the baseline model's challenges in identifying correct classifications consistently.
+The largest relative gain is in macro-F1, which reflects the move from near-constant "entailment" predictions to balanced ones.
 
 <div align="center">
   <img src="metrics/model_performance.png" alt="Model Performance Comparison" width="700"/>
-  <p><em>Figure: Performance comparison of our fine-tuned model against baselines, highlighting the dramatic improvements in balanced prediction capability, particularly in recall and F1 score.</em></p>
+  <p><em>Figure 9: Accuracy and macro-averaged precision, recall and F1 on the test set for the base model and the three fine-tuned configurations (generated from `metrics/card_metrics.json`).</em></p>
 </div>
-
-These results highlight the significant value added by our fine-tuning approach, especially when compared to the true zero-shot performance of the pretrained model. Even when compared to the carefully engineered Mistral-7B-Instruct approach, our fine-tuned model shows substantial gains in accuracy (+13.58 percentage points) and particularly in recall (+32.38 percentage points), while requiring no examples or special prompting.
 
 ### 5.4. Thought Quality Assessment
 
-Another interesting finding was the re-balancing and improvement of prediction quality across different token ranges length ranges in our fine-tuned model:
+Bucketing the fine-tuned model's test-set outputs by the estimated length of the rationale it generated (`scripts/analysis/analyze_finetuned_results.py` on `results/nlistral-ablation1-test-labelled.json`, output in `metrics/finetuned_token_vs_accuracy.json`) gives:
 
-- **Short thoughts (0-100 tokens)**: 83.87% accuracy (155 examples)
-- **Medium thoughts (101-200 tokens)**: 90.12% accuracy (1,549 examples)
-- **Long thoughts (201-300 tokens)**: 92.40% accuracy (250 examples)
-- **Very long thoughts (301+ tokens)**: 60.87% accuracy (23 examples)
-
-When directly compared to the baseline model's performance across token length ranges, we observe significant improvements, particularly for medium and long reasoning chains:
-
-| Token Range | Original Model Accuracy | Fine-tuned Model Accuracy | Improvement |
-|-------------|-------------------------|---------------------------|-------------|
-| 0-100 | 86.06% | 83.87% | -2.19% |
-| 101-200 | 79.34% | 90.12% | +10.78% |
-| 201-300 | 68.99% | 92.40% | +23.41% |
-| 301+ | 56.79% | 60.87% | +4.08% |
+| Estimated token range | Test examples | Accuracy (ablation 1) |
+|-----------------------|--------------:|----------------------:|
+| 0-100 | 155 | 83.87% |
+| 101-200 | 1,549 | 90.12% |
+| 201-300 | 250 | 92.40% |
+| 301+ | 23 | 60.87% |
 
 <div align="center">
-  <img src="metrics/token_accuracy_comparison_combined.png" alt="Comparison of Token Length vs. Accuracy" width="800"/>
-  <p><em>Figure 8: Side-by-side comparison of original model (left) and fine-tuned model (right) accuracy across token length ranges. The visualization reveals a striking pattern where accuracy decreases with token length in the original model but remains high in the fine-tuned model, with the 201-300 token range showing the most dramatic improvement (+23.41%), increasing from 68.99% to 92.40%.</em></p>
+  <img src="metrics/token_vs_accuracy.png" alt="Fine-tuned model accuracy by estimated reasoning-chain length" width="700"/>
+  <p><em>Figure 10: Accuracy of the fine-tuned model (ablation 1) on the test set by estimated length of the generated reasoning chain.</em></p>
 </div>
 
-This comparison reveals that our fine-tuning process produced the most dramatic improvements in the critical medium-to-long token ranges (101-300 tokens), which constitute the majority of examples in our dataset. While the original model shows a clear trend of decreasing accuracy as token length increases (from 86.06% for short chains to 56.79% for the longest), the fine-tuned model maintains high accuracy across most token ranges and actually performs best in the 201-300 token range (92.40%). The slight decrease in accuracy for very short chains (0-100 tokens, -2.19%) suggests the model may have developed a preference for more thorough reasoning over extremely concise explanations. Despite significant improvement (+4.08%), the relatively lower performance on very long chains (301+ tokens, 60.87%) indicates that while our approach helped, extremely lengthy reasoning remains challenging even for the fine-tuned model.
+Unlike the `open-mistral-7b` rationales used to build the training data (Section 3.2, Figure 6), where agreement with the gold label fell steadily with length, the fine-tuned model holds its accuracy through the 101-300 range and is highest in the 201-300 bucket. Accuracy drops for the 23 longest outputs, which is a small sample.
 
-It's important to note that these results come with several methodological caveats:
-
-1. **Different test sets**: The fine-tuned model metrics are from our test set, while the original thought statistics were computed on the entire dataset.
-
-2. **Different baseline models**: The comparison isn't against the base Mistral-7B-v0.3 model but against the Mistral-7B-Instruct model with prompt engineering.
-
-3. **Sample size differences**: The sample sizes in some categories (particularly very short and very long chains) are relatively small in our test set.
-
-Despite these limitations, the pattern of improved handling of medium-to-long reasoning chains appears consistent with our qualitative observations. The fine-tuned model seems to have internalized more robust reasoning patterns that can sustain logical coherence over longer sequences.
+Two caveats apply to any direct comparison with the Section 3.2 table. First, the two tables are on different data and from different models: Figure 6 is the teacher model (`open-mistral-7b` via the API) scored on the training and dev pairs, whereas this table is the fine-tuned model scored on the held-out test pairs. Second, the length of a generated rationale is an output of the model, not a property of the example, so the buckets contain different examples for the two models. The tables therefore describe how each model's accuracy varies with how much it wrote; they do not measure a per-bucket improvement from fine-tuning.
 
 Qualitative assessment of the generated reasoning chains revealed improvements in:
 1. **Logical structure**: More consistent progression from premises to conclusions
@@ -612,15 +559,15 @@ These improvements suggest that our combined approach of CoT data augmentation a
 
 Our results demonstrate the significant improvements achieved through our Reflection-CoT data augmentation and QLoRA fine-tuning approach:
 
-1. **Classification improvement**: Our fine-tuned model achieved a dramatic improvement in accuracy, from 53.77% to 89.58%, representing a 35.81 percentage point (66.60% relative) improvement over the base Mistral-7B model. Even more striking is the F1 score improvement from 41.51% to 89.57%, indicating substantially better balanced performance.
+1. **Classification improvement**: Accuracy rose from 53.77% to 89.58% on the held-out test set, a 35.81 percentage point (66.60% relative) improvement over the base Mistral-7B-v0.3 model, and macro-F1 from 41.51% to 89.57%, reflecting balanced predictions.
 
-2. **Reasoning quality enhancement**: Our analysis suggests improvements in medium-to-long reasoning chains (101-300 tokens), though the comparison is limited by methodological differences in datasets and baselines.
+2. **Reasoning length**: The fine-tuned model's accuracy no longer falls with the length of its reasoning in the 101-300 token range, unlike the teacher model's rationales; the two analyses are on different data and models, so this is an observation rather than a measured per-bucket gain.
 
-3. **Consistent performance**: All three model ablations achieved remarkably similar overall accuracy (89.2%-89.6%), suggesting that our data generation pipeline produces robust training data that leads to stable fine-tuning results across different hyperparameter configurations.
+3. **Consistent performance**: All three model ablations achieved similar overall accuracy (89.2%-89.6%), suggesting that the training data, rather than the particular hyperparameter configuration, drives the result within the ranges tried.
 
 4. **Efficiency gains**: The optimization of sequence length (512 tokens) and focus on concise reasoning allowed for more effective fine-tuning within computational constraints, creating a "double win" of improved performance and reduced resource requirements.
 
-5. **Comparison contexts**: Our fine-tuned model outperformed both the base Mistral-7B (53.77% accuracy, 41.51% F1) and the Mistral-7B-Instruct model with prompt engineering (76.0% accuracy, 69.8% F1 score), while requiring no examples or special prompting.
+5. **Comparison context**: The improvement is measured against the same base model prompted zero-shot (53.77% accuracy, 41.51% macro-F1); no other systems were benchmarked. For reference, the `open-mistral-7b` API model that generated the training rationales agreed with the gold labels on 76.03% of training pairs.
 
 These results demonstrate that our integrated approach—combining Reflection-CoT data augmentation with parameter-efficient QLoRA fine-tuning—successfully addresses the challenges of creating interpretable, accurate NLI systems with limited computational resources.
 
@@ -628,22 +575,13 @@ These results demonstrate that our integrated approach—combining Reflection-Co
 
 ### 6.1. Model Bias and Dataset Considerations
 
-Our experimental process revealed potential biases in both the base models and dataset. The baseline Mistral-7B-v0.3 model demonstrated significant limitations, with only 53.77% accuracy and a particularly low F1 score (41.51%). This disparity between accuracy and F1 score points to a substantial imbalance in the model's predictions, suggesting either inherent biases in how the model processes NLI tasks or difficulties in generating valid structured outputs.
+Our experimental process revealed biases in both the models and the dataset. The base Mistral-7B-v0.3 model, prompted zero-shot, predicted entailment for 94% of test pairs (53.77% accuracy, 41.51% macro-F1, MCC 0.099); it also rarely produced the requested JSON, so most of its labels had to be extracted from free text.
 
-Notably, even when we evaluated Mistral-7B-Instruct with carefully engineered prompts and single-shot examples (76.0% accuracy, 69.8% F1 score), it still exhibited considerable performance gaps compared to our fine-tuned model (89.58% accuracy, 89.57% F1 score). This suggests that instruction tuning alone, without specialized fine-tuning for reasoning tasks, is insufficient for high-quality NLI performance.
+The `open-mistral-7b` API model that generated the training rationales leaned the other way: on the training split it was precise but conservative about entailment (90.71% precision, 59.58% recall for the entailment class), predicting no-entailment for 65% of pairs where the gold labels are 48% no-entailment.
 
-Our analysis of performance by reasoning chain length revealed another form of bias: models tend to perform better with concise reasoning chains (101-200 tokens) and struggle with very long explanations (300+ tokens). This "brevity bias" appears to be a fundamental aspect of reasoning in language models, where concise, focused reasoning paths are more likely to arrive at correct conclusions than lengthy, potentially tangential explorations.
+Agreement with the gold label also fell as the teacher's reasoning grew longer (Section 3.2). The direction of the label bias by length is the opposite of what we first expected: in the training and dev rationales, the shortest chains (0-100 estimated tokens) were the most likely to predict no-entailment (77.6%), falling to 69.0% for 101-200 tokens, 59.4% for 201-300 and 63.5% for 301+. Long chains were therefore not more "hesitant" about entailment; they were less accurate.
 
-Further analysis of the relationship between token length and prediction type revealed an even more striking bias pattern: as reasoning chain length increases, models demonstrate a stronger tendency to predict "no-entailment" and a corresponding decrease in "entailment" predictions. This pattern is visualized in Figure 9:
-
-<div align="center">
-  <img src="metrics/prediction_distribution.png" alt="Prediction distribution by token length" width="700"/>
-  <p><em>Figure 9: Analysis of prediction distribution across token length ranges, demonstrating that longer reasoning chains correlate with higher rates of no-entailment predictions. This suggests that models may become more critical and hesitant to declare entailment as they generate more text, potentially overanalyzing the relationship between premise and hypothesis.</em></p>
-</div>
-
-This finding has significant implications for NLI systems and aligns with observations from experiments with other models (including DeepSeek and o1), where more sophisticated reasoning capabilities sometimes led to decreased performance on this dataset due to over-analysis. We hypothesize that as models generate longer chains of thought, they naturally explore more potential conflicts or edge cases, leading to a conservative bias that favors "no-entailment" classifications. This effect becomes more pronounced with models having stronger reasoning capabilities, creating a counter-intuitive situation where improved reasoning might actually work against alignment with certain dataset labels that were created under different reasoning paradigms.
-
-The fine-tuning process, especially with our Reflection-CoT mechanism, effectively addressed many of these biases, resulting in more balanced predictions (as evidenced by the high F1 score of 89.57%) and improved handling of various reasoning chain lengths.
+The fine-tuning process removed the label skew of both reference models: the fine-tuned model's macro precision and recall are within 0.01 percentage points of each other (89.57% and 89.58%).
 
 ### 6.2. Labeller Bias and Subjectivity in NLI
 
@@ -653,7 +591,7 @@ The pretrained Mistral-7B-v0.3 model's poor performance (53.77% accuracy) may pa
 
 The subjective nature of NLI became increasingly apparent as our models struggled to naturally arrive at the dataset-assigned label for certain examples, despite multiple iterations and reasoning approaches. After consultation with university advisors, we adopted the position that despite these apparent inconsistencies, the dataset labels should be treated as the "gold standard" for the task, informing our development of the Reflection-CoT mechanism.
 
-Our Reflection-CoT approach addressed this challenge by explicitly providing the ground truth label along with the flawed reasoning, allowing the model to learn how to construct valid reasoning paths even for subjective or challenging examples. The dramatic improvement in performance (from 53.77% to 89.58% accuracy) demonstrates the effectiveness of this approach in handling dataset subjectivity.
+Our Reflection-CoT approach addressed this challenge by explicitly providing the ground truth label along with the flawed reasoning, allowing the model to learn how to construct valid reasoning paths even for subjective or challenging examples. The improvement in test accuracy (from 53.77% to 89.58%) shows that the model learned the dataset's labelling even where it is subjective.
 
 ### Trade-Offs, Assumptions, and Efficiency
 
@@ -669,7 +607,7 @@ Our approach balanced several competing objectives:
 
 ### Broader Implications and Methodological Reflections
 
-The bias patterns observed in this study have significant implications for NLI research and applications. The precision-recall imbalance (90% precision, 50% recall) suggests systematic disagreement between human annotators and model reasoning that extends beyond simple model error. Such disagreement raises important questions about the epistemological foundations of NLI tasks—what constitutes valid "entailment" may vary based on interpretation depth, background knowledge assumptions, and reasoning strategies.
+The bias patterns observed in this study have significant implications for NLI research and applications. The precision-recall imbalance of the teacher model's labels (90.71% precision, 59.58% recall for entailment on the training split) suggests systematic disagreement between the annotators and the model's reasoning that extends beyond simple model error. Such disagreement raises important questions about the epistemological foundations of NLI tasks—what constitutes valid "entailment" may vary based on interpretation depth, background knowledge assumptions, and reasoning strategies.
 
 Our Reflection-CoT mechanism represents a pragmatic approach to handling such bias: rather than discarding problematic examples or forcing models to learn potentially inconsistent patterns, we created a transparent reasoning bridge between the model's natural inference tendencies and the dataset's established ground truth. This approach acknowledges bias while providing a structured mechanism to address it.
 
@@ -699,7 +637,7 @@ Our research approach, while demonstrating promising results, has several limita
 
 5. **Evaluation Methodology**: While we analyzed model outputs across different token length ranges, more comprehensive human evaluation of reasoning quality would strengthen confidence in the qualitative improvements.
 
-6. **Subjectivity Handling**: Despite our Reflection-CoT approach, handling cases with inherent subjectivity remains challenging, as demonstrated by the precision-recall imbalance in the dataset.
+6. **Subjectivity Handling**: Despite our Reflection-CoT approach, handling cases with inherent subjectivity remains challenging, as demonstrated by the teacher model's precision-recall imbalance on the training labels.
 
 ### 7.2. Proposed Future Work
 
@@ -751,23 +689,23 @@ This study introduced NLIstral-7B-QLoRA, a fine-tuned language model that combin
 
 2. Introducing the Reflection-CoT mechanism as a novel data augmentation approach that addresses label disagreement by providing models with corrective reasoning, enabling targeted improvement of logical errors.
 
-3. Establishing an empirical connection between reasoning chain length and accuracy in NLI tasks, showing that concise reasoning (150-300 tokens) correlates with higher performance and can be deliberately cultivated through appropriate prompting and fine-tuning.
+3. Documenting an empirical connection between reasoning chain length and agreement with the labels in the generated training data, which motivated prompting for brief, structured reasoning and a 512-token training context.
 
 4. Creating a transparent, interpretable NLI system that provides human-readable justifications for its classifications, enabling better verification, debugging, and trust.
 
-Our experiments revealed that carefully designed data augmentation combined with appropriate parameter-efficient fine-tuning can significantly improve a model's reasoning capabilities. The fine-tuned model demonstrated a dramatic improvement in overall accuracy (from 53.77% to 89.58%) and F1 score (from 41.51% to 89.57%), representing a 66.60% relative improvement in accuracy and a remarkable 115.78% relative improvement in F1 score. The model also showed marked enhancements in handling medium to long reasoning chains (101-300 tokens), effectively addressing the quality degradation observed in the baseline model.
+Our experiments showed that carefully designed data augmentation combined with parameter-efficient fine-tuning can substantially improve a 7B model on this task. On the 1,977-pair held-out test set, accuracy rose from 53.77% to 89.58% and macro-F1 from 41.51% to 89.57% (66.60% and 115.78% relative improvements). The fine-tuned model holds its accuracy across the 101-300 token range of its own reasoning, where the teacher model's rationales had degraded.
 
-Importantly, our approach outperformed not only the zero-shot pretrained model but also instruction-tuned variants with carefully engineered prompts (Mistral-7B-Instruct, 76.0% accuracy, 69.8% F1 score), while requiring no examples or special prompting during inference.
+The fine-tuned model needs no examples or special prompting at inference: it is evaluated with the same bare instruction as the base model.
 
 These findings have implications beyond NLI, suggesting that similar approaches could enhance reasoning capabilities across other language tasks that benefit from step-by-step logical analysis. Future work may explore extending these techniques to more complex reasoning tasks, larger model architectures, and integration with complementary approaches like RLHF and self-consistency methods.
 
-By making both the fine-tuned model and our reflection-augmented dataset publicly available, we hope to facilitate further research into interpretable reasoning in language models and contribute to the development of more transparent AI systems.
+The fine-tuned adapters, the reflection-augmented dataset, the per-example results and the training logs are public on Hugging Face (see README.md), so every number in this report can be recomputed.
 
 ## 9. References
 
-Jiang, Y., Mishra, S., Batra, D., Duan, N., Kalai, A., Liang, P., ... & Hashimoto, T. (2023). Let's verify step by step. arXiv preprint arXiv:2305.20050.
+Lightman, H., Kosaraju, V., Burda, Y., Edwards, H., Baker, B., Lee, T., Leike, J., Schulman, J., Sutskever, I., & Cobbe, K. (2023). Let's Verify Step by Step. arXiv preprint arXiv:2305.20050.
 
-Jiang, Y., Neubig, G., Duan, N., Liang, P., & Hashimoto, T. (2023). DSPy: Compiling Declarative Language Model Calls into Self-Improving Pipelines. arXiv preprint arXiv:2310.03714.
+Khattab, O., Singhvi, A., Maheshwari, P., Zhang, Z., Santhanam, K., Vardhamanan, S., Haq, S., Sharma, A., Joshi, T. T., Moazam, H., Miller, H., Zaharia, M., & Potts, C. (2023). DSPy: Compiling Declarative Language Model Calls into Self-Improving Pipelines. arXiv preprint arXiv:2310.03714.
 
 Dettmers, T., Pagnoni, A., Holtzman, A., & Zettlemoyer, L. (2023). QLoRA: Efficient Finetuning of Quantized LLMs. arXiv preprint arXiv:2305.14314.
 
@@ -775,10 +713,10 @@ Hu, E. J., Shen, Y., Wallis, P., Allen-Zhu, Z., Li, Y., Wang, S., ... & Chen, W.
 
 Kojima, T., Gu, S. S., Reid, M., Matsuo, Y., & Iwasawa, Y. (2022). Large language models are zero-shot reasoners. arXiv preprint arXiv:2205.11916.
 
-Mistral AI. (2023). Mistral 7B. https://huggingface.co/mistralai/Mistral-7B-v0.1
+Jiang, A. Q., Sablayrolles, A., Mensch, A., Bamford, C., Chaplot, D. S., de las Casas, D., ... & Sayed, W. E. (2023). Mistral 7B. arXiv preprint arXiv:2310.06825.
 
 Wei, J., Wang, X., Schuurmans, D., Bosma, M., Ichter, B., Xia, F., ... & Zhou, D. (2022). Chain-of-thought prompting elicits reasoning in large language models. arXiv preprint arXiv:2201.11903.
 
 Wei, J., Tay, Y., Bommasani, R., Raffel, C., Zoph, B., Borgeaud, S., ... & Fedus, W. (2022). Emergent abilities of large language models. arXiv preprint arXiv:2206.07682.
 
-Code and the Reflection-CoT augmented dataset are available at our project repository.
+Code: https://github.com/j-d0g/mistral-7b-nli. Dataset: https://huggingface.co/datasets/jd0g/Mistral-NLI-Thoughts. Results: https://huggingface.co/datasets/jd0g/nlistral-7b-results.

@@ -8,7 +8,7 @@ This directory contains the datasets for the Mistral-7B NLI fine-tuning project.
 - `finetune/`: Processed data for fine-tuning
 - `original_thoughts/`: Original thought generations for NLI examples
 - `reflected_thoughts/`: Reflections on the NLI reasoning process
-- `scored_thoughts/`: Thought examples with evaluation scores
+- `scored_thoughts/`: Thought examples with scores from an earlier, abandoned LLM-as-a-judge stage (not used for fine-tuning)
 
 ## Usage
 
@@ -44,5 +44,6 @@ This will upload all relevant data directories to the repository.
 
 ## Notes
 
-- The dataset is stored in the Hugging Face repository: `jd0g/nlistral-7b-dataset`
-- The upload and download scripts require a Hugging Face API token in `.env` file (HF_TOKEN) 
+- The dataset is stored in the public Hugging Face repository [`jd0g/Mistral-NLI-Thoughts`](https://huggingface.co/datasets/jd0g/Mistral-NLI-Thoughts), under the `data/` prefix
+- Downloading needs no token; uploading requires a Hugging Face token in the `.env` file (`HF_TOKEN`)
+- Row counts and the split are documented in the README's "Data and splits" section

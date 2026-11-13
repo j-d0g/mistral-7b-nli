@@ -22,8 +22,7 @@ This document provides instructions for preparing the datasets needed for fine-t
 ---
 
 # Quick Start
-For a deeper dive on into the code & experimentation, see - [Deep Dive: Data Preparation Pipeline](#deep-dive-data-preparation-pipeline)
-.
+For a deeper dive into the code and experimentation, see [Deep Dive: Data Preparation Pipeline](#deep-dive-data-preparation-pipeline).
 
 To skip straight to model training or inference, see **[TRAINING.md](TRAINING.md)**, **[EVALUATION.md](EVALUATION.md)**.
 
@@ -31,8 +30,8 @@ For more methodology/results oriented details, check out the **[REPORT.md](REPOR
 ## Prerequisites
 
 Before you begin with the datasets, ensure you have:
-1. **Created a Hugging Face token** (store in `.env` file as `HF_TOKEN=your_token_here`)
-2. **Created a Mistral API Key** (store in `.env` file as `MISTRAL_API_KEY=your_token_here`)
+1. **A Hugging Face token** (store in `.env` as `HF_TOKEN=your_token_here`). The datasets are public, so this is optional for downloading; it is needed to upload.
+2. **A Mistral API key** (store in `.env` as `MISTRAL_API_KEY=your_key_here`), only if you want to regenerate the rationales.
 3. **Have Python >= 3.10** installed on your machine.
 4. **Built the Docker image if using Docker (Optional)**:
    ```bash
@@ -43,26 +42,30 @@ are tailor written to follow by building the docker image for best results, due 
 
 ## Downloading Pre-Generated Datasets
 
-The fastest way to get started is to download the pre-generated datasets from Hugging Face:
+The fastest way to get started is to download the pre-generated datasets from the public Hugging Face dataset [`jd0g/Mistral-NLI-Thoughts`](https://huggingface.co/datasets/jd0g/Mistral-NLI-Thoughts):
 
 ```bash
-# From the project root directory:
+# From the project root directory (plain Python works too: python3 data/download_data.py)
 docker run --rm -v $(pwd):/app -w /app --env-file .env mistral-nli-ft python3 data/download_data.py
 ```
 
-This will download all the necessary datasets and place them in the appropriate directories.
+This downloads every file under the dataset's `data/` prefix into the local `data/` directory (about 190 MB).
 
 ## Dataset Structure
 
 After downloading, you'll have these key datasets:
 
-*   `data/original_data/`: CSV files with premise-hypothesis pairs and labels (train.csv, dev.csv, test.csv)
-*   `data/original_thoughts/`: JSON files with Chain-of-Thought reasoning for each example
-*   `data/reflected_thoughts/`: JSON files with improved reasoning for examples that were initially incorrect
-*   `data/finetune/`: JSONL files formatted for fine-tuning, including:
-    - `train_ft.jsonl` - Standard training data
-    - `dev_ft.jsonl` - Validation dataset
-    - `sample_ft.jsonl` - Small sample dataset for testing
+*   `data/original_data/`: CSV files with premise-hypothesis pairs and labels: `train.csv` (35,593 rows), `dev.csv` (1,977), `test.csv` (1,977), plus the unlabelled course hidden-test inputs `submission.csv` (3,302) and a 100-row `sample.csv`
+*   `data/original_thoughts/`: JSON lines with the `open-mistral-7b` rationale and label for each pair (`train_thoughts.json` 35,597 rows, `dev_thoughts.json` 1,977, `test_thoughts.json` 1,973)
+*   `data/reflected_thoughts/`: corrected rationales from `open-mistral-nemo` for the pairs the first stage got wrong (`train_reflections.json` 8,531, `dev_reflections.json` 497, `test_reflections.json` 570)
+*   `data/finetune/`: JSONL files formatted for fine-tuning:
+    - `train_ft.jsonl` (35,597 rows) - training data: correct original rationales plus reflected ones
+    - `dev_ft.jsonl` (1,977 rows) - validation data
+    - `train_ft_final.jsonl` (37,571 rows) - training data plus 1,973 test pairs, for a final model after evaluation. Do not evaluate a model trained on this file on `test.csv`.
+    - `sample_ft.jsonl` (113 rows) - small sample for smoke tests
+*   `data/scored_thoughts/`: outputs of an earlier, abandoned LLM-as-a-judge stage; not used by the fine-tuning files
+
+The split (90% / 5% / 5% of 39,547 labelled pairs) is documented in the README's "Data and splits" section; no pair appears in more than one labelled file.
 
 ## Next Steps
 
@@ -140,8 +143,6 @@ If you prefer to use Docker, or are using the same machine as for training, the 
 ## Stage 1: Generate Thoughts
 
 In this stage, we add Chain-of-Thought reasoning to the original CSV examples. This involves prompting the Mistral API to generate step-by-step reasoning for each example.
-```bash
-# Build Docker 
 
 ```bash
 # Process training data (Docker version)
@@ -167,7 +168,7 @@ The script outputs a JSON file containing each example with:
 
 ## Stage 2: Generate Reflections
 
-This stage identifies incorrect examples from Stage 1 and generates improved reasoning. It uses a potentially stronger model to reflect on the errors and provide better explanations.
+This stage identifies incorrect examples from Stage 1 and generates improved reasoning. It uses the stronger `open-mistral-nemo` (12B) model to reflect on the errors and provide better explanations (the `--model-name` flag chooses the model; the published reflections were made with `open-mistral-nemo`).
 
 ```bash
 # Process training data (Docker version)
@@ -199,7 +200,7 @@ The final stage combines:
 1. Correct examples from the original thoughts (Stage 1)
 2. Reflected examples with improved reasoning (Stage 2)
 
-This creates a high-quality dataset for fine-tuning.
+This produces one fine-tuning example per original pair.
 
 ```bash
 # Process training data
@@ -230,7 +231,7 @@ The pipeline has clear dependencies:
 
 - Maintain consistent naming conventions throughout the pipeline
 - Use the same parameters for both training and validation datasets
-- Set `--workers 6` to maximize throughput and API rate limits
+- `--workers 6` worked well against the Mistral API rate limits
 - Check the summary files generated after each stage
 - Always validate the final JSONL files before fine-tuning
 

@@ -46,4 +46,6 @@ Inference runs typically produce:
 *   **`.json` file**: Contains detailed output for each sample, including premise, hypothesis, predicted label, and the model's generated text (which includes the chain-of-thought reasoning).
 *   **`.csv` file**: A simple CSV containing just the `prediction` column with 0/1 values, useful for quick analysis or scoring.
 
-Files are named using the pattern: `[model_name]-[dataset_name]-[labelled|unlabelled].[extension]` 
+Files are named using the pattern: `[model_name]-[dataset_name]-[labelled|unlabelled].[extension]`.
+
+The published result files in `jd0g/nlistral-7b-results` are `mistral-base-test-labelled.json` (zero-shot base model), `nlistral-ablation{0,1}-{dev,test}-labelled.json`, `nlistral-ablation2-dev-labelled.json`, `nlistral-ablation2og-test-labelled.json` (the `ablation2.py` run) and the two 3,302-row `*-submission*` files for the course hidden test set. Each JSON records the local model directory it was produced from in its `model` field. `scripts/analysis/compute_test_metrics.py` recomputes the metrics from them.

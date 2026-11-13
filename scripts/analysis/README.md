@@ -1,41 +1,24 @@
 # Analysis Scripts
 
-This directory contains all the scripts needed to analyze data and generate visualizations for the Mistral-7B NLI project.
+This directory contains the scripts that compute the numbers and draw the figures used in the documentation. All of them read the public data and result files (`python3 data/download_data.py`, `python3 results/download_results.py`) and write to `metrics/`.
 
-## Visualization Regeneration
+### Scripts
 
-All visualizations can be regenerated from the processed data. The PNG files are excluded from version control to keep the repository size small.
+- `compute_test_metrics.py`: accuracy, macro precision/recall/F1 and MCC for each result file, plus a check that no evaluated pair appears in `train.csv`
+- `analyze_finetuned_results.py`: fine-tuned model accuracy by estimated rationale length (`metrics/token_vs_accuracy.png`, `metrics/finetuned_token_vs_accuracy.json`)
+- `analyze_original_thoughts.py`: agreement of the `open-mistral-7b` rationales with the gold label by estimated length (`metrics/original_token_vs_accuracy.png` and `.json`)
+- `analyze_token_accuracy.py`: same analysis as `analyze_finetuned_results.py` with a configurable results file; also writes the result into `card_metrics.json`
+- `analyze_token_lengths.py`: split sizes, label balance and estimated token statistics for `card_metrics.json`
+- `generate_card_metrics.py`: older metrics generator kept for reference
+- `generate_card_visualizations.py`: diagrams and the `card_metrics.json`-based figures (`dataset_statistics.png`, `token_lengths.png`, `model_performance.png`)
+- `plot_training_dynamics.py`: validation loss and token accuracy from the public `trainer_state.json` logs (`metrics/training_dynamics.png`)
+- `visualize_wandb_training.py`: the same curves from Weights & Biases, if you have access to the runs
 
-### How to Regenerate All Visualizations
-
-Run the following command from the project root:
-
-```bash
-./run_metrics.sh
-```
-
-This will execute all necessary scripts to analyze the data and regenerate all visualization files.
-
-### Individual Scripts
-
-- `generate_card_visualizations.py`: Generates all visualizations for model and dataset cards
-- `generate_card_metrics.py`: Computes metrics for model and dataset cards
-- `analyze_token_lengths.py`: Analyzes token lengths of the thoughts and generates visualizations
-- `analyze_token_accuracy.py`: Analyzes the relationship between token length and accuracy
-- `analyze_original_thoughts.py`: Analyzes original thoughts dataset
-- `generate_realistic_training_dynamics.py`: Generates training dynamics visualizations
-- `visualize_wandb_training.py`: Visualizes training metrics from Weights & Biases
-
-### Example: Regenerating Card Visualizations Only
-
-```bash
-python scripts/analysis/generate_card_visualizations.py
-```
+Token counts in these scripts are estimated as characters / 4, not with the Mistral tokenizer.
 
 ### Output Locations
 
-- Model and dataset card visualizations: `metrics/`
-- Training analysis visualizations: `metrics/train_analysis/`
+- `metrics/`
 
 ## Dependencies
 

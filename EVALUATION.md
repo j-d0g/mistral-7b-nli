@@ -22,8 +22,7 @@ This document provides instructions for evaluating NLI models on test datasets, 
 ---
 
 # Quick Start
-For a deeper dive on into the code & experimentation, see - [Deep Dive: Evaluation Details](#deep-dive-evaluation-tetails)
-.
+For a deeper dive into the code and experimentation, see [Deep Dive: Evaluation Details](#deep-dive-evaluation-details).
 
 To follow the data augmentation process or to train your own QLoRA adaptors, follow **[DATA.md](DATA.md)**, **[TRAINING.md](TRAINING.md)**.
 
@@ -41,7 +40,7 @@ Before you begin evaluating models, ensure you have:
    ```
 4. **Either a trained model using instructions in [TRAINING.md](TRAINING.md) or a downloaded model checkpoint**
 
-> **Note:** Unlike the instructions in instructions in [DATA.md](DATA.md), which can be run locally with Python, **Docker is required** for model evaluation due to the complex GPU dependencies, model quantization requirements, and compatibility needs. The `run_inference.sh` script is specifically designed to work within the Docker container environment to ensure consistent results across different hardware setups.
+> **Note:** Unlike the instructions in [DATA.md](DATA.md), which can be run locally with Python, **Docker is required** for model evaluation due to the complex GPU dependencies, model quantization requirements, and compatibility needs. The `run_inference.sh` script is specifically designed to work within the Docker container environment to ensure consistent results across different hardware setups.
 
 ## Evaluating a Model
 
@@ -107,7 +106,7 @@ After evaluation completes, you'll find these files in the `results/` directory:
    - Used for detailed analysis and debugging
 
 2. **CSV file** (`results/[model_name]-[dataset_name]-[labelled|unlabelled].csv`):
-   - Contains just the `prediction` column with 0/1 values
+   - Contains just the `predicted_label` column with 0/1 values
    - Simplified format for quick review or submission
 
 The script also saves checkpoint files during processing (`results/checkpoint_[model_name]-[dataset_name]-[labelled|unlabelled].json`), which can be useful for debugging or recovering from interruptions.
@@ -183,8 +182,8 @@ Here are more detailed examples of running inference:
 # Evaluating a specific checkpoint from training
 ./run_inference.sh --model models/nlistral-ablation1/checkpoint-500 --data data/original_data/test.csv
 
-# Running on unlabeled data (will not report accuracy)
-./run_inference.sh --model models/nlistral-ablation1 --data data/sample/unlabeled_examples.csv
+# Running on unlabelled data (will not report accuracy), e.g. the course hidden-test inputs
+./run_inference.sh --model models/nlistral-ablation1 --data data/original_data/submission.csv
 
 # Running the interactive notebook (alternative to command-line)
 ./run_notebook.sh
@@ -194,11 +193,11 @@ Here are more detailed examples of running inference:
 
 ### JSON Output Example
 
-Here's an example of the structure of the JSON output file (based on actual results):
+Here's an example of the structure of the JSON output file (abridged from `results/nlistral-ablation1-test-labelled.json` in the results dataset; the `model` field records the local directory the run was evaluated from):
 
 ```json
 {
-  "model": "models/nlistral-ablation1",
+  "model": "models/mistral-thinking-default-epochs2",
   "inference_time_seconds": 8745.582508087158,
   "samples_per_second": 0.2260569834166954,
   "use_cot": true,
@@ -234,7 +233,7 @@ Note that the model's output is stored in the `output` field, which contains the
 The CSV output is very simple and only contains the predicted labels:
 
 ```csv
-prediction
+predicted_label
 1
 0
 1
@@ -245,11 +244,16 @@ This format is intended for submission or quick processing when only the final p
 
 ## Metrics and Calculations
 
-If the input data contains labels, the evaluation calculates these metrics:
+If the input data contains labels, `sample_model.py` records accuracy, precision, recall and F1 (macro-averaged) in the JSON output, along with inference time and per-example results.
 
-* **Accuracy**: Proportion of correctly classified examples
-* **Inference Time**: Total processing time and samples per second
-* **Detailed Results**: Per-example analysis including the prediction and reasoning
+To recompute the published numbers from the result files (accuracy, macro precision/recall/F1, MCC, and a check that no evaluated pair appears in `train.csv`):
+
+```bash
+python3 results/download_results.py          # public dataset jd0g/nlistral-7b-results
+python scripts/analysis/compute_test_metrics.py
+```
+
+`./run_metrics.sh results/<file>.json` runs `evaluate/parse_predictions.py` in Docker for a more detailed breakdown of how labels were extracted from the model output.
 
 For NLI classification:
 - Label 1 (entailment) is treated as the positive class
@@ -263,8 +267,8 @@ The `run_inference.sh` script supports these options:
 
 ```bash
 ./run_inference.sh \
-  --model PATH  # Path to model (default: models/mistral-7b-nli-cot)
-  --data PATH   # Path to data CSV (default: data/sample/demo.csv)
+  --model PATH  # Path to model (default: models/nlistral-ablation1)
+  --data PATH   # Path to data CSV (default: data/original_data/sample.csv)
   --gpu ID      # GPU ID to use (default: 0)
 ```
 
@@ -310,12 +314,8 @@ Several strategies are employed to maximize inference speed:
 
 ## Further Information
 
-You've now completed the steps to running inference on quantized Mistral models with Chain-of-Thought QLoRA adaptors!
 To revisit earlier stages in the pipeline, see:
 - **Synthetic Data Augmentation**: [DATA.md](DATA.md)
 - **Training**: [TRAINING.md](TRAINING.md)
 
-For a hollistic research-oriented deep dive on the methodology, experiments and findings, check out:
-- **Research Methodology**: [REPORT.md](REPORT.md) 
-
-Otherwise, thanks for visiting this repository!
+For the methodology, experiments and findings, see [REPORT.md](REPORT.md).

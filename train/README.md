@@ -6,10 +6,11 @@ This directory contains the scripts and configuration files for fine-tuning the 
 
 - `train_sft.py`: Main training implementation using PEFT and QLoRA
 - `config_loader.py`: Configuration loading utility
-- `configs/`: Directory containing various training configurations
-  - `default.py`: Base configuration with default parameters
-  - `sample_test.py`: Minimal configuration for testing
-  - `ablation0.py`, `ablation1.py`, etc.: Configurations for different experiments
+- `configs/`: Directory containing the training configurations
+  - `ablation{0,1,2}.py` and `ablation{0,1,2}_best.py`: the three ablation tracks and their tuned versions (`ablation1_best.py` is the best on the held-out test set)
+  - `quick_test.py`: minimal configuration for smoke tests on the sample data
+  - `distributed.py`: multi-GPU variant
+  - `archive/`: earlier configurations kept for reference
 
 ## Usage
 
@@ -19,7 +20,7 @@ Basic usage:
 
 ```bash
 # From the project root:
-./run_training.sh --config train/configs/default.py
+./run_training.sh --config train/configs/ablation1_best.py
 ```
 
 See the main [TRAINING.md](../TRAINING.md) for more options and detailed explanations. 

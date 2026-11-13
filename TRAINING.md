@@ -20,10 +20,9 @@ This document provides instructions for training the Mistral-7B NLI model using 
 ---
 
 # Quick Start
-For a deeper dive on into the code & experimentation, see - [Deep Dive: Technical Details](#deep-dive-technical-tetails)
-.
+For a deeper dive into the code and experimentation, see [Deep Dive: Technical Details](#deep-dive-technical-details).
 
-To skip straight to model training or inference, see **[EVALUATION.md](EVALUATION.md)**.
+To skip straight to inference with a trained model, see **[EVALUATION.md](EVALUATION.md)**.
 
 For more methodology/results oriented details, check out the **[REPORT.md](REPORT.md)**.
 
@@ -37,7 +36,7 @@ Before you begin training, ensure you have:
    ```bash
    docker build -t mistral-nli-ft .
    ```
-4. **Created a Hugging Face token** (store in `.env` file as `HF_TOKEN=your_token_here`)
+4. **Created a Hugging Face token** (store in `.env` file as `HF_TOKEN=your_token_here`), needed to download the gated base model `mistralai/Mistral-7B-v0.3`
 
 > **Note:** Unlike data preparation which can be done locally with Python, **Docker is required** for the training process due to the complex GPU dependencies and compatibility requirements of quantization and PEFT libraries. The `run_training.sh` script is specifically designed to work within the Docker container environment.
 
@@ -294,16 +293,16 @@ The choice of QLoRA parameters involves balancing model expressiveness, training
 *   **Rank (`r`) and Alpha (`lora_alpha`):**
     *   `r` determines the rank (size) of the adapter matrices. Higher `r` allows the adapter to capture more complex patterns but increases trainable parameters.
     *   `lora_alpha` acts as a scaling factor for the adapter weights. A common heuristic is `lora_alpha = 2 * r`.
-    *   **Experimental Findings:** The final configuration adopted `r=32`, `lora_alpha=64`. This higher rank was chosen to provide the necessary capacity to model the diverse reasoning paths, especially for the reflected thought examples.
+    *   **Experimental Findings:** Rank 16 / alpha 32 (`ablation1_best.py`) gave the best test accuracy (89.58%); rank 32 / alpha 64 (`ablation2.py`) trained stably with gradient clipping but did not improve on it (89.33%). See the README's Results section.
 *   **Dropout (`lora_dropout`):** A small dropout (e.g., 0.05) is applied to the LoRA layers for regularization.
 
 ### Key Training Hyperparameters
 
 These parameters control the optimization process:
 
-*   **`num_epochs` (e.g., 3):** How many times to iterate over the training dataset. Using validation loss (`eval_loss`) with early stopping is recommended.
+*   **`num_epochs` (2 to 5 in the configurations here):** How many times to iterate over the training dataset. `train_sft.py` evaluates every 250 steps, stops early after 3 evaluations without improvement in `eval_loss`, and keeps the best checkpoint.
 *   **Batch Size (`per_device_train_batch_size`, `gradient_accumulation_steps`):**
-    *   `per_device_train_batch_size` is limited by GPU memory (e.g., 2-4 for a 7B model on a 24GB GPU with QLoRA).
+    *   `per_device_train_batch_size` is limited by GPU memory; with `max_seq_length=512` and 4-bit weights the configurations here use 8 or 16.
     *   `gradient_accumulation_steps` allows simulating a larger effective batch size. An effective batch size of ~32-64 is common.
 *   **Learning Rate (`learning_rate`, `lr_scheduler_type`, `warmup_ratio`):**
     *   `learning_rate` (e.g., `2e-4`) is often slightly higher for PEFT than full fine-tuning. Values between `1e-4` and `3e-4` were explored.
@@ -312,7 +311,7 @@ These parameters control the optimization process:
 *   **Optimizer (`optim`, `weight_decay`):**
     *   `paged_adamw_8bit` is a memory-efficient AdamW variant suitable for QLoRA.
     *   `weight_decay` (e.g., `0.01`) provides L2 regularization.
-*   **Sequence Length (`max_seq_length`):** Set to `512` based on analysis showing that shorter thought processes (~250-400 tokens total input+output) correlated with higher accuracy, while dramatically reducing memory usage and computation time compared to default lengths (e.g., 2048 or 4096).
+*   **Sequence Length (`max_seq_length`):** Set to `512`. Three quarters of the generated rationales are under about 196 estimated tokens, so prompt plus rationale fits for almost all examples; the few longer ones are truncated. The shorter context cuts memory and compute compared with the default 2048.
 
 ## Advanced Troubleshooting
 
@@ -364,7 +363,7 @@ The project includes several training ablations to explore different configurati
    - **ablation2.py**: Base version with larger batch, higher rank, stability measures
    - **ablation2_best.py**: Refined version with even lower learning rate (5e-5) and extended training (5 epochs)
 
-The ablation configurations are available in the `train/configs/` directory and can be specified with the `--config` parameter. 
+The ablation configurations are available in the `train/configs/` directory and can be specified with the `--config` parameter. Which run produced which published number, and the caveat about `ablation2_best.py` being trained on `train_ft_final.jsonl`, are in the README's Results section.
 
 ## Further Information
 
