@@ -101,7 +101,9 @@ with patience 3 on validation loss, and the best checkpoint kept (`train/train_s
 
 The `ablation2.py` configuration (learning rate 1e-4, 3 epochs, warm-up ratio 0.10) is the one behind the
 ablation 2 test result below; `ablation2_best.py` was trained on `finetune/train_ft_final.jsonl`, which merges
-the test pairs into training, so it is reported only on the dev split.
+the test pairs into training, so it is reported only on the dev split. The training logs also show that the
+ablation 0 and ablation 2 runs saw about 27,200 training rows per epoch rather than the 35,597 in
+`train_ft.jsonl`; that intermediate training file was not published. The ablation 1 run used the full file.
 
 #### Training logs and runtime
 

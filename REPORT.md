@@ -87,7 +87,7 @@ Our system integrates a multi-stage data augmentation pipeline with parameter-ef
 
 Our primary contributions are:
 
-1. The **Reflection-CoT** mechanism: A novel data augmentation approach that addresses label disagreement by providing models with both the correct label and flawed reasoning, enabling targeted correction of logical errors.
+1. The **Reflection-CoT** mechanism: A data augmentation approach that addresses label disagreement by providing models with both the correct label and flawed reasoning, enabling targeted correction of logical errors.
 
 2. An empirical analysis of **CoT length and label agreement**: Showing that, in the generated training data, shorter reasoning chains agree with the gold labels more often, which informed both the prompt design and the 512-token training context.
 
@@ -482,7 +482,7 @@ Figure 8 plots the validation metrics logged by the trainer every 250 steps (`tr
 
 Observations from the logs:
 
-1. **Convergence**: Validation loss falls from about 0.73-0.75 at step 250 to 0.69-0.70 at the end of each run (ablation 0: 0.753 to 0.699; ablation 1: 0.737 to 0.691; ablation 2: 0.726 to 0.699). Most of the drop happens in the first third of each run.
+1. **Convergence**: Validation loss falls from about 0.73-0.75 at step 250 to 0.69-0.70 at the end of each run (ablation 0: 0.753 to 0.699; ablation 1: 0.737 to 0.691; ablation 2: 0.726 to 0.699). Between half and two thirds of that drop happens in the first third of each run.
 
 2. **Effect of effective batch size**: Per optimiser step, the larger-batch runs reach a given loss sooner, as expected; per example seen, the three runs are close.
 
@@ -577,7 +577,7 @@ These results demonstrate that our integrated approach—combining Reflection-Co
 
 Our experimental process revealed biases in both the models and the dataset. The base Mistral-7B-v0.3 model, prompted zero-shot, predicted entailment for 94% of test pairs (53.77% accuracy, 41.51% macro-F1, MCC 0.099); it also rarely produced the requested JSON, so most of its labels had to be extracted from free text.
 
-The `open-mistral-7b` API model that generated the training rationales leaned the other way: on the training split it was precise but conservative about entailment (90.71% precision, 59.58% recall for the entailment class), predicting no-entailment for 65% of pairs where the gold labels are 48% no-entailment.
+The `open-mistral-7b` API model that generated the training rationales leaned the other way: on the training split it was precise but conservative about entailment (90.71% precision, 59.58% recall for the entailment class), predicting no-entailment for 66% of pairs where the gold labels are 48% no-entailment.
 
 Agreement with the gold label also fell as the teacher's reasoning grew longer (Section 3.2). The direction of the label bias by length is the opposite of what we first expected: in the training and dev rationales, the shortest chains (0-100 estimated tokens) were the most likely to predict no-entailment (77.6%), falling to 69.0% for 101-200 tokens, 59.4% for 201-300 and 63.5% for 301+. Long chains were therefore not more "hesitant" about entailment; they were less accurate.
 
@@ -687,7 +687,7 @@ This study introduced NLIstral-7B-QLoRA, a fine-tuned language model that combin
 
 1. Demonstrating the effectiveness of parameter-efficient QLoRA fine-tuning for reasoning tasks, making it practical to improve LLM reasoning capabilities within modest computational constraints.
 
-2. Introducing the Reflection-CoT mechanism as a novel data augmentation approach that addresses label disagreement by providing models with corrective reasoning, enabling targeted improvement of logical errors.
+2. Introducing the Reflection-CoT mechanism as a data augmentation approach that addresses label disagreement by providing models with corrective reasoning, enabling targeted improvement of logical errors.
 
 3. Documenting an empirical connection between reasoning chain length and agreement with the labels in the generated training data, which motivated prompting for brief, structured reasoning and a 512-token training context.
 

@@ -135,7 +135,7 @@ Reducing the maximum sequence length was a key optimization driven by both perfo
 
 4. **The "Double Win":**
    - **Improved Accuracy:** Concise reasoning correlated with higher accuracy
-   - **Massive Efficiency Gains:** Shorter sequences dramatically reduced computation (transformer attention scales quadratically with sequence length) and memory requirements
+   - **Efficiency Gains:** Shorter sequences reduced computation (transformer attention scales quadratically with sequence length) and memory requirements
 
 This optimization made training faster, freed GPU memory for other hyperparameter exploration, reduced inference time significantly, and increased overall project feasibility.
 
